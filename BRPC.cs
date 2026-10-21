@@ -7244,6 +7244,20 @@ namespace BedrockPackStudio
     {
         protected override bool ShowFocusCues { get { return false; } }
         public override void NotifyDefault(bool value) { base.NotifyDefault(false); }
+
+        // Windows рисует надпись неактивной кнопки системным серым, а на тёмном фоне его почти не видно.
+        // Кнопки со своими значками (без надписи) и с картинкой не трогаются.
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            if (Enabled || Text.Length == 0 || Image != null) return;
+            Rectangle r = ClientRectangle;
+            int edge = FlatStyle == FlatStyle.Flat ? FlatAppearance.BorderSize : 2;
+            r.Inflate(-edge, -edge);
+            using (SolidBrush bg = new SolidBrush(BackColor)) e.Graphics.FillRectangle(bg, r);
+            TextFormatFlags how = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
+            TextRenderer.DrawText(e.Graphics, Text, Font, r, Theme.Dim, how);
+        }
     }
 
     // Витрина режима 3D: каждый объект собран в объём. Моб — по своей модели, блок — кубом из своих сторон (верх, низ, бок),
@@ -15388,7 +15402,7 @@ namespace BedrockPackStudio
                 if (Environment.GetEnvironmentVariable("BPS_THEME") == null) Settings.Set("theme", Theme.Dark ? "dark" : "light");
                 ApplyTheme();
             };
-            L.Bind(delegate(string v_) { tips.SetToolTip(themeBtn, v_); }, "Светлая или тёмная тема");
+            L.Bind(delegate(string v_) { tips.SetToolTip(themeBtn, v_); themeBtn.AccessibleName = v_; }, "Светлая или тёмная тема");
             // режим витрины: той же формы, что кнопка темы; в режиме 3D горит зелёным
             modeBtn.FlatStyle = FlatStyle.Flat;
             modeBtn.Font = new Font(Font, FontStyle.Bold);
@@ -15450,7 +15464,7 @@ namespace BedrockPackStudio
                 using (SolidBrush hole = new SolidBrush(gear.BackColor)) gg.FillEllipse(hole, gcx - 2.4f, gcy - 2.4f, 4.8f, 4.8f);
             };
             gear.Click += delegate { ShowSettings(gear); };
-            L.Bind(delegate(string v_) { slowTips.SetToolTip(gear, v_); }, "Настройки");
+            L.Bind(delegate(string v_) { slowTips.SetToolTip(gear, v_); gear.AccessibleName = v_; }, "Настройки");
             packsHead.Controls.Add(gear);
             saveProj.SetBounds(gear.Right + Gap, 0, 118, Row);
             saveProj.Cursor = Cursors.Hand;
@@ -15570,15 +15584,15 @@ namespace BedrockPackStudio
             Button removeBtn = IconBtn("x", Color.FromArgb(208, 52, 52), "Убрать выбранный пакет из списка", delegate { RemovePack(); });
             packBtns.Controls.Add(removeBtn);
             // у правого края ряда — страница проекта на GitHub; без ссылки кнопка неактивна
-            Button gitBtn = IconBtn("github", neutral, "Страница проекта на GitHub: отзывы и новые версии", delegate
+            Button gitBtn = IconBtn("text:GitHub", neutral, "Страница проекта на GitHub: отзывы и новые версии", delegate
             {
                 try { Process.Start(Support.GitHub.Trim()); }
                 catch (Exception ex) { MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
             });
             gitBtn.Enabled = Support.GitHub.Trim().Length > 0;
             if (!gitBtn.Enabled) gitBtn.Cursor = Cursors.Default;
-            // слева от GitHub — сервер в Discord, кнопка его фирменного цвета; без ссылки тоже неактивна
-            Button discordBtn = IconBtn("discord", Color.FromArgb(88, 101, 242), "Сервер проекта в Discord", delegate
+            // слева от GitHub — сервер в Discord; без ссылки тоже неактивна
+            Button discordBtn = IconBtn("text:Discord", neutral, "Сервер проекта в Discord", delegate
             {
                 try { Process.Start(Support.Discord.Trim()); }
                 catch (Exception ex) { MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
@@ -15602,8 +15616,10 @@ namespace BedrockPackStudio
                     Padding pm = new Padding(0, 0, Gap + (k < 3 && k < spare ? 1 : 0), 0);
                     if (pb.Margin != pm) pb.Margin = pm;
                 }
-                if (gitBtn.Size != new Size(bw, bh)) gitBtn.Size = new Size(bw, bh);
-                if (discordBtn.Size != new Size(bw, bh)) discordBtn.Size = new Size(bw, bh);
+                // кнопки-ссылки с надписями шире значков: пара занимает ширину кнопки «Файлы» под ней
+                int lw = Math.Max(bw, (catW - Gap) / 2);
+                if (gitBtn.Size != new Size(lw, bh)) gitBtn.Size = new Size(lw, bh);
+                if (discordBtn.Size != new Size(lw, bh)) discordBtn.Size = new Size(lw, bh);
                 if (packBtns.Height != bh + Gap) packBtns.Height = bh + Gap;
                 if (gitBtn.Margin != Padding.Empty) gitBtn.Margin = Padding.Empty;
                 // пара Discord и GitHub прижата к правому краю: свободное место уходит в отступ перед первой из них
@@ -15939,7 +15955,7 @@ namespace BedrockPackStudio
                 if (nothingIn) status.Text = L.T("Корзина пуста.");
             };
             topBar.Controls.Add(trashBtn);
-            L.Bind(delegate(string v_) { tips.SetToolTip(trashBtn, v_ + (trashLog.Count > 0 ? "  (" + trashLog.Count + ")" : "")); }, "Корзина: текстуры, убранные из списка");
+            L.Bind(delegate(string v_) { tips.SetToolTip(trashBtn, v_ + (trashLog.Count > 0 ? "  (" + trashLog.Count + ")" : "")); trashBtn.AccessibleName = v_; }, "Корзина: текстуры, убранные из списка");
             favBtn.SetBounds(trashBtn.Right + Gap, 0, (int)Math.Round(Row / 0.97), Row); // высота — 97% ширины
             // название открытого проекта — в свободном месте между звездой и кнопкой темы
             projLabel.AutoSize = false;
@@ -15961,7 +15977,7 @@ namespace BedrockPackStudio
             favBtn.CheckedChanged += delegate { favLook(); };
             restyle.Add(favLook);
             favLook();
-            L.Bind(delegate(string v_) { tips.SetToolTip(favBtn, v_); }, "Показать текстуры, сохранённые в программе: они добавляются в список как пакет «Избранное»");
+            L.Bind(delegate(string v_) { tips.SetToolTip(favBtn, v_); favBtn.AccessibleName = v_; }, "Показать текстуры, сохранённые в программе: они добавляются в список как пакет «Избранное»");
             favBtn.CheckedChanged += delegate { ToggleFavorites(); };
             topBar.Controls.Add(favBtn);
 
@@ -16975,41 +16991,12 @@ namespace BedrockPackStudio
                 {
                     if (symbol == "+") { g.DrawLine(pen, cx - 6, cy, cx + 6, cy); g.DrawLine(pen, cx, cy - 6, cx, cy + 6); }
                     else if (symbol == "x") { g.DrawLine(pen, cx - 5, cy - 5, cx + 5, cy + 5); g.DrawLine(pen, cx + 5, cy - 5, cx - 5, cy + 5); }
-                    else if (symbol == "github")
+                    else if (symbol.StartsWith("text:"))
                     {
-                        // знак GitHub: светлый круг, в нём силуэт кота цветом кнопки
-                        Color ink = b.Enabled ? Color.White : Color.FromArgb(150, 255, 255, 255);
-                        RectangleF disc = new RectangleF(cx - 10, cy - 10, 20, 20);
-                        using (SolidBrush light = new SolidBrush(ink)) g.FillEllipse(light, disc);
-                        using (GraphicsPath clip = new GraphicsPath())
-                        using (SolidBrush dark = new SolidBrush(b.BackColor))
-                        using (Pen tail = new Pen(b.BackColor, 1.6f))
-                        {
-                            clip.AddEllipse(disc);
-                            Region old = g.Clip;
-                            g.SetClip(clip);
-                            g.FillEllipse(dark, cx - 6.5f, cy - 5.5f, 13, 10.5f);
-                            g.FillPolygon(dark, new PointF[] { new PointF(cx - 6.5f, cy - 7.5f), new PointF(cx - 6.5f, cy - 1), new PointF(cx - 1.5f, cy - 4.5f) });
-                            g.FillPolygon(dark, new PointF[] { new PointF(cx + 6.5f, cy - 7.5f), new PointF(cx + 6.5f, cy - 1), new PointF(cx + 1.5f, cy - 4.5f) });
-                            g.FillRectangle(dark, cx - 2.6f, cy + 3.5f, 5.2f, 8);
-                            g.DrawBezier(tail, cx - 2.6f, cy + 7.2f, cx - 4.5f, cy + 8f, cx - 5.5f, cy + 5.5f, cx - 7.5f, cy + 5.2f);
-                            g.Clip = old;
-                        }
-                    }
-                    else if (symbol == "discord")
-                    {
-                        // знак Discord: светлая «маска» с двумя глазами цвета кнопки; по размеру — как знак GitHub рядом
-                        Color ink = b.Enabled ? Color.White : Color.FromArgb(150, 255, 255, 255);
-                        PointF[] body = {
-                            new PointF(cx - 7.5f, cy - 6f), new PointF(cx - 4f, cy - 7f), new PointF(cx - 2.6f, cy - 5.4f), new PointF(cx + 2.6f, cy - 5.4f),
-                            new PointF(cx + 4f, cy - 7f), new PointF(cx + 7.5f, cy - 6f), new PointF(cx + 10f, cy + 3.6f), new PointF(cx + 6.6f, cy + 6.8f),
-                            new PointF(cx + 4.6f, cy + 4.4f), new PointF(cx - 4.6f, cy + 4.4f), new PointF(cx - 6.6f, cy + 6.8f), new PointF(cx - 10f, cy + 3.6f) };
-                        using (SolidBrush light = new SolidBrush(ink)) g.FillClosedCurve(light, body, FillMode.Winding, 0.35f);
-                        using (SolidBrush dark = new SolidBrush(b.BackColor))
-                        {
-                            g.FillEllipse(dark, cx - 5.4f, cy - 2.1f, 3.9f, 4.8f);
-                            g.FillEllipse(dark, cx + 1.5f, cy - 2.1f, 3.9f, 4.8f);
-                        }
+                        // кнопка-ссылка с надписью; неактивная — надпись бледнее
+                        Color ink = b.Enabled ? Color.White : Color.FromArgb(170, 255, 255, 255);
+                        TextRenderer.DrawText(g, symbol.Substring(5), new Font(Font.FontFamily, 9f, FontStyle.Bold), b.ClientRectangle, ink,
+                            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
                     }
                     else if (symbol == "up") g.FillPolygon(Brushes.White, new Point[] { new Point(cx, cy - 5), new Point(cx + 6, cy + 4), new Point(cx - 6, cy + 4) });
                     else g.FillPolygon(Brushes.White, new Point[] { new Point(cx - 6, cy - 4), new Point(cx + 6, cy - 4), new Point(cx, cy + 5) });
@@ -17026,7 +17013,7 @@ namespace BedrockPackStudio
             b.Cursor = Cursors.Hand;
             b.Tag = "keep";
             b.Click += click;
-            L.Bind(delegate(string v_) { slowTips.SetToolTip(b, v_); }, tip);
+            L.Bind(delegate(string v_) { slowTips.SetToolTip(b, v_); b.AccessibleName = v_; }, tip);
             return b;
         }
 
