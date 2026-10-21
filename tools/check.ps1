@@ -104,6 +104,29 @@ $r = Merge $t @('T', 'P', 'S')
 if ($r.Code -ne 0) { Fail ('сборка завершилась с кодом ' + $r.Code) } else { Ok 'сборка без ошибок' }
 if ($r.Log -match 'Файлов в сборке: 10\.') { Ok 'в сборке 10 файлов' } else { Fail 'в журнале нет «Файлов в сборке: 10.»' }
 
+# ---- набор 4: авторы и лицензии исходных пакетов попадают в сборку
+Write-Host 'Набор 4: авторы и лицензии в сборке'
+$t = Join-Path $root 'set4'
+W "$t\L1\manifest.json" (MkMan 'Первый пакет' ',"metadata":{"authors":["Автор Один"],"license":"CC BY 4.0"}')
+W "$t\L1\credits.txt" 'Made by Author One'
+MkPng "$t\L1\textures\blocks\stone.png" ([System.Drawing.Color]::Red)
+W "$t\L2\manifest.json" (MkMan 'Second pack' ',"metadata":{"authors":["Author Two"]}')
+W "$t\L2\LICENSE" 'All rights reserved'
+MkPng "$t\L2\textures\blocks\dirt.png" ([System.Drawing.Color]::Blue)
+W "$t\L3\manifest.json" (MkMan 'Unused pack' ',"metadata":{"authors":["Nobody"]}')
+MkPng "$t\L3\textures\blocks\stone.png" ([System.Drawing.Color]::Green)
+$r = Merge $t @('L1', 'L2', 'L3')
+if ($r.Code -ne 0) { Fail ('сборка завершилась с кодом ' + $r.Code) } else { Ok 'сборка без ошибок' }
+if (Test-Path $r.Zip) {
+    $z = [IO.Compression.ZipFile]::OpenRead($r.Zip); $names = @($z.Entries | ForEach-Object { $_.FullName }); $z.Dispose()
+    if (($names -contains 'credits/Первый пакет/pack.json') -and ($names -contains 'credits/Первый пакет/credits.txt') -and ($names -contains 'credits/Second pack/LICENSE')) { Ok 'в credits есть оба пакета с их файлами' } else { Fail ('папка credits неполная: ' + (($names | Where-Object { $_ -like 'credits/*' }) -join ', ')) }
+    if (-not ($names | Where-Object { $_ -like 'credits/Unused pack/*' })) { Ok 'пакет, из которого ничего не взято, в credits не попал' } else { Fail 'в credits попал неиспользованный пакет' }
+    $man = ReadEntry $r.Zip 'manifest.json'
+    if ($man -match 'Автор Один' -and $man -match 'Author Two' -and $man -notmatch 'Nobody') { Ok 'авторы использованных пакетов есть в описании сборки' } else { Fail ('авторы в manifest.json неверные: ' + $man) }
+    $info = ReadEntry $r.Zip 'credits/Первый пакет/pack.json'
+    if ($info -and $info -notmatch '[A-Za-z]:\\\\') { Ok 'в pack.json нет путей с диска' } else { Fail 'в pack.json есть путь с диска' }
+} else { Fail 'файл сборки не создан' }
+
 # ---- набор 3: временная папка — очистка убирает только своё
 Write-Host 'Набор 3: очистка временной папки не трогает чужие файлы'
 $t = Join-Path $root 'set3'

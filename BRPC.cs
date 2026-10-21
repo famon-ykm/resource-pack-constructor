@@ -259,6 +259,7 @@ namespace BedrockPackStudio
             { "Страница проекта на GitHub: отзывы и новые версии", "Project page on GitHub: feedback and new versions" },
             { "Сервер проекта в Discord", "Project server on Discord" },
             { "Поддержать", "Support" },
+            { "Авторы и лицензии исходных пакетов сохранены в папке credits: ", "Authors and licences of the source packs are kept in the credits folder: " },
             { "Поддержка добровольная и по желанию — если вам нравится проект.\nЭто не покупка: программа бесплатна и ничего за это не открывает.\nЕсли вам меньше 18 лет, сначала спросите родителей.", "Support is voluntary — only if you like the project.\nIt is not a purchase: the program is free and nothing is unlocked by it.\nIf you are under 18, ask your parents first." },
             { "в корзине; вернуть можно кнопкой корзины наверху", "in the bin; the bin button at the top brings it back" },
             { "Корзина: текстуры, убранные из списка", "Bin: textures removed from the list" },
@@ -1348,6 +1349,13 @@ namespace BedrockPackStudio
             {
                 string icon = Path.Combine(javaRoot, "pack.png");
                 if (File.Exists(icon)) File.Copy(icon, Path.Combine(outDir, "pack_icon.png"), true);
+            }
+            catch (Exception) { }
+            // авторство и лицензия Java-пакета не должны потеряться при переводе
+            try
+            {
+                foreach (string lf in Directory.GetFiles(javaRoot))
+                    if (Builder.IsCreditFile(Path.GetFileName(lf))) File.Copy(lf, Path.Combine(outDir, Path.GetFileName(lf)), true);
             }
             catch (Exception) { }
             notes.Add("«" + name + L.T("»: пакет Java-издания переведён в вид Bedrock. Текстур перенесено: ") + done + L.T("; без соответствия в Bedrock осталось: ") + lost + ".");
@@ -2620,7 +2628,7 @@ namespace BedrockPackStudio
             return l;
         }
 
-        static byte[] Manifest(string name, string desc, List<Pack> packs, List<string> log, bool hasSets)
+        static byte[] Manifest(string name, string desc, List<Pack> packs, List<string> log, bool hasSets, List<string> authors)
         {
             int[] min = new int[] { 1, 16, 0 };
             List<object> caps = new List<object>();
@@ -2660,6 +2668,13 @@ namespace BedrockPackStudio
             foreach (Pack p in packs)
                 if (p.Sub != null) log.Add("«" + p.Name + L.T("»: в сборку вшит вариант «") + p.SubFolder + "».");
             if (caps.Count > 0) root.Set("capabilities", caps);
+            if (authors != null && authors.Count > 0)
+            {
+                // сборка состоит из чужих работ: их авторы перечислены в описании пакета
+                JObj meta = new JObj();
+                meta.Set("authors", new List<object>(authors.ToArray()));
+                root.Set("metadata", meta);
+            }
             return new UTF8Encoding(false).GetBytes(Json.Write(root) + "\n");
         }
 
@@ -3019,6 +3034,113 @@ namespace BedrockPackStudio
             }
         }
 
+        // Файлы авторства и лицензии в корне пакета: credits.txt, LICENSE, readme.md и подобные.
+        public static bool IsCreditFile(string fileName)
+        {
+            string n = fileName.ToLowerInvariant();
+            if (n.IndexOf((char)47) >= 0 || n.IndexOf((char)92) >= 0) return false;
+            if (Risk.Program(n) || Risk.Archive(n)) return false;
+            return n.StartsWith("credit") || n.StartsWith("licen") || n.StartsWith("readme") || n.StartsWith("copying") || n.StartsWith("author");
+        }
+
+        // Пакеты, из которых в сборку взят хотя бы один файл: победитель каждого файла, все источники слитых файлов,
+        // пакеты выбранных слоёв. Вариант (subpack) засчитывается своему пакету.
+        static List<Pack> UsedPacks(List<Entry> entries, Dictionary<string, Doc> docs, List<Pack> own)
+        {
+            List<Pack> used = new List<Pack>();
+            Action<Pack> add = delegate(Pack p)
+            {
+                if (p == null || p == Pack.Off) return;
+                Pack owner = own.Find(delegate(Pack q) { return q == p || q.Sub == p; });
+                if (owner != null && !used.Contains(owner)) used.Add(owner);
+            };
+            foreach (Entry e in entries)
+            {
+                if (e.Orphan || e.Excluded) continue;
+                add(e.Winner);
+                if (e.Sources.Count > 1 && (docs.ContainsKey(e.Key) || KindOf(e.Key) == MergeKind.Lang)) foreach (Pack sp in e.Sources) add(sp);
+                add(e.PbrChoice);
+                if (e.Slots != null) foreach (Pack lp in e.Slots.Values) add(lp);
+            }
+            used.Sort(delegate(Pack a, Pack b) { return own.IndexOf(a).CompareTo(own.IndexOf(b)); });
+            return used;
+        }
+
+        static JObj ManifestOf(Pack p)
+        {
+            try
+            {
+                string rel;
+                if (!p.Files.TryGetValue("manifest.json", out rel)) return null;
+                FileInfo fi = new FileInfo(Path.Combine(p.Root, rel));
+                if (fi.Length > 1024 * 1024) return null; // настоящий manifest маленький
+                return Json.Parse(File.ReadAllText(fi.FullName)) as JObj;
+            }
+            catch (Exception) { return null; }
+        }
+
+        static List<string> AuthorsOf(Pack p)
+        {
+            List<string> r = new List<string>();
+            JObj man = ManifestOf(p);
+            JObj meta = man == null ? null : man.Get("metadata") as JObj;
+            List<object> list = meta == null ? null : meta.Get("authors") as List<object>;
+            if (list != null)
+                foreach (object o in list)
+                {
+                    string a = o as string;
+                    if (a != null && a.Trim().Length > 0 && a.Length <= 200) r.Add(a.Trim());
+                }
+            return r;
+        }
+
+        // Папка credits в сборке: для каждого использованного пакета — его файлы авторства и лицензии и pack.json
+        // с названием, описанием и метаданными из его manifest. Без путей на диске пользователя.
+        static int PutCredits(List<Pack> used, Action<string, byte[]> put)
+        {
+            int count = 0;
+            HashSet<string> names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (Pack p in used)
+            {
+                JObj man = ManifestOf(p);
+                List<string> files = new List<string>();
+                foreach (KeyValuePair<string, string> kv in p.Files)
+                    if (IsCreditFile(kv.Key)) files.Add(kv.Value);
+                if (man == null && files.Count == 0) continue;
+                // коды цвета Minecraft («§l», «§6») в имени папки не нужны
+                string folder = System.Text.RegularExpressions.Regex.Replace(p.Name ?? "pack", "§.?", "");
+                foreach (char c in Path.GetInvalidFileNameChars()) folder = folder.Replace(c, (char)95);
+                folder = folder.Trim().TrimEnd((char)46);
+                if (folder.Length > 60) folder = folder.Substring(0, 60).Trim();
+                if (folder.Length == 0) folder = "pack";
+                string unique = folder;
+                for (int n = 2; !names.Add(unique); n++) unique = folder + " (" + n + ")";
+                string dir = "credits/" + unique + "/";
+                JObj info = new JObj();
+                info.Set("name", p.Name ?? "");
+                JObj header = man == null ? null : man.Get("header") as JObj;
+                if (header != null)
+                {
+                    if (header.Get("description") is string) info.Set("description", header.Get("description"));
+                    if (header.Get("uuid") is string) info.Set("uuid", header.Get("uuid"));
+                    if (header.Get("version") != null) info.Set("version", header.Get("version"));
+                }
+                if (man != null && man.Get("metadata") != null) info.Set("metadata", man.Get("metadata"));
+                if (p.Origin != null) info.Set("source_file", Path.GetFileName(p.Origin.TrimEnd((char)92, (char)47)));
+                if (p.Java) info.Set("converted_from", "Java Edition");
+                put(dir + "pack.json", new UTF8Encoding(false).GetBytes(Json.Write(info) + "\n"));
+                foreach (string rel in files)
+                    try
+                    {
+                        FileInfo fi = new FileInfo(Path.Combine(p.Root, rel));
+                        if (fi.Length <= 4 * 1024 * 1024) put(dir + Path.GetFileName(rel), File.ReadAllBytes(fi.FullName));
+                    }
+                    catch (Exception) { }
+                count++;
+            }
+            return count;
+        }
+
         public static List<string> Build(List<Entry> entries, List<Pack> packs, string name, string desc, string outPath, List<VariantOut> variants = null)
         {
             List<string> log = new List<string>();
@@ -3034,6 +3156,7 @@ namespace BedrockPackStudio
                     || (p.Origin != null && string.Equals(outFull, Path.GetFullPath(p.Origin).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase));
                 if (clash) throw new IOException(L.T("Нельзя сохранять сборку внутрь исходного пакета или поверх него: ") + p.Name);
             }
+            List<Pack> ownPacks = packs;
             packs = Layers(packs);
             bool manyShaders;
             Pack shader = LightOwner(packs, out manyShaders);
@@ -3124,7 +3247,14 @@ namespace BedrockPackStudio
                     }
                 };
 
-                put("manifest.json", Manifest(name, desc, packs, log, hasSets));
+                List<Pack> usedPacks = UsedPacks(entries, docs, ownPacks);
+                List<string> authors = new List<string>();
+                foreach (Pack up in usedPacks)
+                    foreach (string au in AuthorsOf(up))
+                        if (!authors.Contains(au)) authors.Add(au);
+                put("manifest.json", Manifest(name, desc, packs, log, hasSets, authors));
+                int credited = PutCredits(usedPacks, put);
+                if (credited > 0) log.Add(L.T("Авторы и лицензии исходных пакетов сохранены в папке credits: ") + credited + ".");
                 foreach (Entry e in entries)
                 {
                     if (e.Orphan) { orphans++; continue; }
