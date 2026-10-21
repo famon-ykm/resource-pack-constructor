@@ -2,6 +2,11 @@
 
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 
+### ⬇ [Download the program (ResourcePackConstructor.zip)](https://github.com/famon-ykm/resource-pack-constructor/releases/latest/download/ResourcePackConstructor.zip)
+### ⬇ [Скачать программу (ResourcePackConstructor.zip)](https://github.com/famon-ykm/resource-pack-constructor/releases/latest/download/ResourcePackConstructor.zip)
+
+Unpack the archive and run `ResourcePackConstructor.exe`. / Распакуйте архив и запустите `ResourcePackConstructor.exe`.
+
 A Windows program for browsing Minecraft Bedrock resource packs side by side and merging them into one `.mcpack`.
 
 Программа для Windows: показывает пакеты текстур Minecraft Bedrock рядом и собирает из них один `.mcpack`. [Описание на русском](#по-русски) ниже.
