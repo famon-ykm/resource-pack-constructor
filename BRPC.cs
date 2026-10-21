@@ -287,6 +287,11 @@ namespace BedrockPackStudio
             { "   |   пакет из архива: правка действует до закрытия программы (в сборку попадёт)", "   |   pack from an archive: the edit lasts until the program is closed (it does go into the build)" },
             { "Непредвиденная ошибка:\n", "Unexpected error:\n" },
             { "Архив слишком большой.", "The archive is too large." },
+            { "Архив слишком большой: после распаковки больше 4 ГБ.", "The archive is too large: more than 4 GB when unpacked." },
+            { "В архиве слишком много вложенных архивов (больше ", "The archive holds too many nested archives (more than " },
+            { "Файл картинки слишком большой.", "The image file is too large." },
+            { "Картинка слишком большая: ", "The image is too large: " },
+            { " (предел ", " (limit " },
             { "Нельзя сохранять сборку внутрь исходного пакета или поверх него: ", "The build cannot be saved inside or over a source pack: " },
             { "Карт слоёв, которые ничто не использует, не вошло в сборку: ", "Layer maps used by nothing and left out of the build: " },
             { "Избранное", "Favorites" },
@@ -787,14 +792,57 @@ namespace BedrockPackStudio
             return e == ".png" || e == ".tga" || e == ".jpg" || e == ".jpeg";
         }
 
+        // Пределы для картинок из пакетов: подложенный файл не должен занять всю память.
+        const int MaxSide = 8192;
+        const long MaxFile = 256L * 1024 * 1024;
+
         // Грузит без блокировки файла и всегда отдаёт 32bppArgb.
         public static Bitmap Load(string path)
         {
+            if (new FileInfo(path).Length > MaxFile) throw new InvalidDataException(L.T("Файл картинки слишком большой."));
             byte[] data = File.ReadAllBytes(path);
+            CheckSides(data, Path.GetExtension(path).ToLowerInvariant());
             if (Path.GetExtension(path).ToLowerInvariant() == ".tga") return LoadTga(data);
             using (MemoryStream ms = new MemoryStream(data))
             using (Bitmap src = new Bitmap(ms))
                 return Copy(src);
+        }
+
+        // Ширина и высота из заголовка файла (PNG, JPG, TGA) — до того, как картинку начнут раскладывать в память.
+        static void CheckSides(byte[] d, string ext)
+        {
+            int w = 0, h = 0;
+            if (d.Length >= 24 && d[0] == 0x89 && d[1] == 0x50 && d[2] == 0x4E && d[3] == 0x47)
+            {
+                w = (d[16] << 24) | (d[17] << 16) | (d[18] << 8) | d[19];
+                h = (d[20] << 24) | (d[21] << 16) | (d[22] << 8) | d[23];
+            }
+            else if (d.Length >= 4 && d[0] == 0xFF && d[1] == 0xD8)
+            {
+                int i = 2;
+                while (i + 9 < d.Length)
+                {
+                    if (d[i] != 0xFF) { i++; continue; }
+                    int m = d[i + 1];
+                    if (m == 0xD8 || m == 0x01 || (m >= 0xD0 && m <= 0xD7) || m == 0xFF) { i++; continue; }
+                    int len = (d[i + 2] << 8) | d[i + 3];
+                    if (m >= 0xC0 && m <= 0xCF && m != 0xC4 && m != 0xC8 && m != 0xCC)
+                    {
+                        h = (d[i + 5] << 8) | d[i + 6];
+                        w = (d[i + 7] << 8) | d[i + 8];
+                        break;
+                    }
+                    if (len < 2) break;
+                    i += 2 + len;
+                }
+            }
+            else if (ext == ".tga" && d.Length >= 18)
+            {
+                w = d[12] | (d[13] << 8);
+                h = d[14] | (d[15] << 8);
+            }
+            if (w < 0 || h < 0 || w > MaxSide || h > MaxSide)
+                throw new InvalidDataException(L.T("Картинка слишком большая: ") + w + "×" + h + L.T(" (предел ") + MaxSide + "×" + MaxSide + ").");
         }
 
         public static void Save(Bitmap bmp, string path)
@@ -1523,6 +1571,8 @@ namespace BedrockPackStudio
             {
                 if (tempDir != null)
                 {
+                    bytesLeft = SourceBytes;
+                    nestedLeft = SourceNested;
                     Extract(path, tempDir);
                     Unwrap(tempDir, 0);
                 }
@@ -1560,6 +1610,12 @@ namespace BedrockPackStudio
         // вложенные архивы распаковываются на месте, и пакеты внутри находятся как обычно.
         static int unwrapped; // счётчик вложенных архивов: из него делаются короткие имена их папок
 
+        // Пределы на один добавляемый источник вместе со всеми вложенными архивами: защита от «архивных бомб».
+        const long SourceBytes = 4L * 1024 * 1024 * 1024;
+        const int SourceNested = 200;
+        static long bytesLeft = SourceBytes;
+        static int nestedLeft = SourceNested;
+
         static void Unwrap(string dir, int depth)
         {
             try
@@ -1569,6 +1625,7 @@ namespace BedrockPackStudio
                 {
                     string ext = Path.GetExtension(file).ToLowerInvariant();
                     if (ext != ".mcpack" && ext != ".zip" && ext != ".mcaddon") continue;
+                    if (--nestedLeft < 0) throw new InvalidDataException(L.T("В архиве слишком много вложенных архивов (больше ") + SourceNested + ").");
                     // короткое имя папки: у вложенного архива путь и так длинный
                     string sub = Path.Combine(Path.GetDirectoryName(file), "p" + (++unwrapped));
                     try
@@ -1577,9 +1634,11 @@ namespace BedrockPackStudio
                         File.Delete(file);
                         if (depth < 2) Unwrap(sub, depth + 1);
                     }
+                    catch (InvalidDataException) { throw; } // сработал предел — загрузка источника останавливается
                     catch (Exception) { }
                 }
             }
+            catch (InvalidDataException) { throw; }
             catch (Exception) { }
         }
 
@@ -1699,8 +1758,7 @@ namespace BedrockPackStudio
         {
             string full = Path.GetFullPath(dir) + Path.DirectorySeparatorChar;
             Directory.CreateDirectory(dir);
-            const long MaxBytes = 4L * 1024 * 1024 * 1024; // больше настоящие паки не бывают; защита от «архивных бомб»
-            long total = 0;
+            // общий остаток на весь источник: вложенные архивы не получают каждый свои 4 ГБ
             int count = 0;
             byte[] buf = new byte[81920];
             using (ZipArchive zip = ZipFile.OpenRead(zipPath))
@@ -1728,8 +1786,8 @@ namespace BedrockPackStudio
                         int n;
                         while ((n = src.Read(buf, 0, buf.Length)) > 0)
                         {
-                            total += n;
-                            if (total > MaxBytes) throw new InvalidDataException(L.T("Архив слишком большой."));
+                            bytesLeft -= n;
+                            if (bytesLeft < 0) throw new InvalidDataException(L.T("Архив слишком большой: после распаковки больше 4 ГБ."));
                             dst.Write(buf, 0, n);
                         }
                     }
@@ -18626,8 +18684,9 @@ namespace BedrockPackStudio
                 }
                 else
                 {
-                    byte[] data = File.ReadAllBytes(path);
-                    bool binary = data.Length > 4000000;
+                    // большой файл не читается в память целиком только ради того, чтобы сказать, что он не текстовый
+                    byte[] data = size > 4000000 ? new byte[0] : File.ReadAllBytes(path);
+                    bool binary = size > 4000000;
                     for (int i = 0; !binary && i < data.Length && i < 8000; i++) if (data[i] == 0) binary = true;
                     if (binary) editor.Text = L.T("Этот файл не текстовый, показать его здесь нельзя.\r\nЕго можно открыть кнопкой «Открыть в другой программе».");
                     else

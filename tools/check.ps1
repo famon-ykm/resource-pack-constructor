@@ -127,6 +127,43 @@ if (Test-Path $r.Zip) {
     if ($info -and $info -notmatch '[A-Za-z]:\\\\') { Ok 'в pack.json нет путей с диска' } else { Fail 'в pack.json есть путь с диска' }
 } else { Fail 'файл сборки не создан' }
 
+# ---- набор 5: подложенные файлы — архивная бомба и огромная картинка
+Write-Host 'Набор 5: защита от архивных бомб и огромных картинок'
+$t = Join-Path $root 'set5'
+# архив, в котором 201 вложенный архив: загрузка должна остановиться с понятной причиной
+$inner = Join-Path $t 'inner'
+W "$inner\x.txt" 'x'
+[IO.Compression.ZipFile]::CreateFromDirectory($inner, "$t\one.zip")
+$nest = Join-Path $t 'nest'
+New-Item -ItemType Directory -Force $nest | Out-Null
+for ($i = 1; $i -le 201; $i++) { Copy-Item "$t\one.zip" (Join-Path $nest ('n' + $i + '.zip')) }
+[IO.Compression.ZipFile]::CreateFromDirectory($nest, "$t\bomb.mcpack")
+$env:BPS_DEFAULTS = '1'; $env:BPS_LANG = 'ru'
+$sw = [Diagnostics.Stopwatch]::StartNew()
+$proc = Start-Process -FilePath $exe -ArgumentList @('--merge', ('"' + "$t\out.mcpack" + '"'), '"Merged"', ('"' + "$t\bomb.mcpack" + '"')) -Wait -PassThru
+$sw.Stop()
+$log = if (Test-Path "$t\out.mcpack.log") { [IO.File]::ReadAllText("$t\out.mcpack.log", [Text.Encoding]::UTF8) } else { '' }
+if ($proc.ExitCode -ne 0 -and $log -match 'вложенных архивов') { Ok ('архив с 201 вложенным архивом остановлен за ' + [int]$sw.Elapsed.TotalSeconds + ' с') } else { Fail ('архивная бомба не остановлена (код ' + $proc.ExitCode + ')') }
+# картинка, которая в заголовке называет себя 20000×20000
+$png = "$t\huge.png"
+MkPng $png ([System.Drawing.Color]::Red)
+$b = [IO.File]::ReadAllBytes($png)
+foreach ($o in 16, 20) { $b[$o] = 0; $b[$o + 1] = 0; $b[$o + 2] = 0x4E; $b[$o + 3] = 0x20 }
+[IO.File]::WriteAllBytes($png, $b)
+$imgProbe = @'
+param($exe, $file)
+$asm = [Reflection.Assembly]::LoadFile($exe)
+$img = $asm.GetType('BedrockPackStudio.Img')
+try { $img.GetMethod('Load').Invoke($null, @($file)) | Out-Null; 'loaded' }
+catch { $_.Exception.InnerException.Message }
+'@
+$imgProbeFile = Join-Path $t 'imgprobe.ps1'
+[IO.File]::WriteAllText($imgProbeFile, $imgProbe, (New-Object System.Text.UTF8Encoding $true))
+$said = & powershell -NoProfile -ExecutionPolicy Bypass -File $imgProbeFile $exe $png
+if ("$said" -match '20000') { Ok 'картинка 20000×20000 не загружена' } else { Fail ('огромная картинка не остановлена: ' + $said) }
+$said = & powershell -NoProfile -ExecutionPolicy Bypass -File $imgProbeFile $exe "$root\set1\A\textures\blocks\stone.png"
+if ("$said" -eq 'loaded') { Ok 'обычная картинка загружается' } else { Fail ('обычная картинка не загрузилась: ' + $said) }
+
 # ---- набор 3: временная папка — очистка убирает только своё
 Write-Host 'Набор 3: очистка временной папки не трогает чужие файлы'
 $t = Join-Path $root 'set3'
