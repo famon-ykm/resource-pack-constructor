@@ -1,0 +1,33 @@
+# Only the program itself is published. Everything is ignored by default,
+# and the files below are the whole public project.
+*
+!.gitignore
+!BRPC.cs
+!build.bat
+!README.md
+!LICENSE
+!docs/
+!docs/screenshot.png
+!tools/
+!tools/check.bat
+!tools/check.ps1
+
+# Never published, even if added above by mistake:
+# build output (exe goes to Releases), packs and projects of the user,
+# unpacked archives, AI working files, files of unknown purpose.
+*.exe
+*.pdb
+*.log
+*.tmp
+*.mcpack
+*.mcaddon
+*.zip
+*.brpc
+*.brpc-tmp
+temp/
+BRPC-temp/
+.claude/
+/1
+/1.txt
+Thumbs.db
+desktop.ini
