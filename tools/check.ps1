@@ -104,6 +104,49 @@ $r = Merge $t @('T', 'P', 'S')
 if ($r.Code -ne 0) { Fail ('сборка завершилась с кодом ' + $r.Code) } else { Ok 'сборка без ошибок' }
 if ($r.Log -match 'Файлов в сборке: 10\.') { Ok 'в сборке 10 файлов' } else { Fail 'в журнале нет «Файлов в сборке: 10.»' }
 
+# ---- набор 3: временная папка — очистка убирает только своё
+Write-Host 'Набор 3: очистка временной папки не трогает чужие файлы'
+$t = Join-Path $root 'set3'
+$app = Join-Path $t 'app'
+$tmp = Join-Path $t 'tmp'
+New-Item -ItemType Directory -Force $app, $tmp | Out-Null
+Copy-Item $exe (Join-Path $app 'BRPC.exe')
+# чужое: файл и папка в BRPC-temp, старая папка temp
+W "$app\BRPC-temp\чужой файл.txt" 'не удалять'
+W "$app\BRPC-temp\чужая папка\внутри.txt" 'не удалять'
+W "$app\temp\не удалять.txt" 'не удалять'
+# пакет архивом: при сборке он распаковывается в BRPC-temp и после неё убирается
+W "$t\Z\manifest.json" (MkMan 'Z' '')
+MkPng "$t\Z\textures\blocks\stone.png" ([System.Drawing.Color]::Red)
+[IO.Compression.ZipFile]::CreateFromDirectory("$t\Z", "$t\Z.mcpack")
+$env:BPS_DEFAULTS = '1'; $env:BPS_LANG = 'ru'
+$proc = Start-Process -FilePath (Join-Path $app 'BRPC.exe') -ArgumentList @('--merge', ('"' + "$t\out.mcpack" + '"'), '"Merged"', ('"' + "$t\Z.mcpack" + '"')) -Wait -PassThru
+if ($proc.ExitCode -eq 0) { Ok 'архив собран' } else { Fail ('сборка архива завершилась с кодом ' + $proc.ExitCode) }
+$left = @(Get-ChildItem -LiteralPath "$app\BRPC-temp" -Force | Where-Object { $_.Name -ne 'чужой файл.txt' -and $_.Name -ne 'чужая папка' })
+if ($left.Count -eq 0) { Ok 'распакованное после сборки убрано' } else { Fail ('после сборки в BRPC-temp осталось: ' + (($left | ForEach-Object { $_.Name }) -join ', ')) }
+# полная очистка (как при закрытии программы): своя помеченная папка удаляется, чужое остаётся.
+# Отдельный процесс с временной папкой Windows внутри проверки, чтобы не задеть открытое окно программы.
+New-Item -ItemType Directory -Force "$app\BRPC-temp\наша распаковка" | Out-Null
+W "$app\BRPC-temp\наша распаковка\a.txt" 'x'
+W "$app\BRPC-temp\наша распаковка.brpc-temp" 'BRPC'
+$probe = @'
+param($exe)
+$asm = [Reflection.Assembly]::LoadFile($exe)
+$pl = $asm.GetType('BedrockPackStudio.PackLoader')
+$f = [Reflection.BindingFlags]'Static,Public,NonPublic'
+$pl.GetMethod('ClearTemp', $f).Invoke($null, @()) | Out-Null
+'cleared ' + $pl.GetField('TempBase', $f).GetValue($null)
+'@
+$probeFile = Join-Path $t 'probe.ps1'
+[IO.File]::WriteAllText($probeFile, $probe, (New-Object System.Text.UTF8Encoding $true))
+$oldTmp = $env:TMP; $oldTemp = $env:TEMP
+$env:TMP = $tmp; $env:TEMP = $tmp
+try { $said = & powershell -NoProfile -ExecutionPolicy Bypass -File $probeFile (Join-Path $app 'BRPC.exe') }
+finally { $env:TMP = $oldTmp; $env:TEMP = $oldTemp }
+if ("$said" -like 'cleared*BRPC-temp') { Ok 'очистка запущена в BRPC-temp' } else { Fail ('очистка не запустилась: ' + $said) }
+if (-not (Test-Path -LiteralPath "$app\BRPC-temp\наша распаковка")) { Ok 'своя распаковка удалена' } else { Fail 'своя распаковка не удалена' }
+if ((Test-Path -LiteralPath "$app\BRPC-temp\чужой файл.txt") -and (Test-Path -LiteralPath "$app\BRPC-temp\чужая папка\внутри.txt") -and (Test-Path -LiteralPath "$app\temp\не удалять.txt")) { Ok 'чужие файлы и папки на месте' } else { Fail 'очистка удалила чужие файлы' }
+
 Write-Host ''
 if ($failed.Count -eq 0) {
     Write-Host '=== ПРОВЕРКА ПРОЙДЕНА ===' -ForegroundColor Green

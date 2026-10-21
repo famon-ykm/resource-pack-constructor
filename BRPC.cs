@@ -509,7 +509,7 @@ namespace BedrockPackStudio
             { "Спрашивать об очистке TEMP при закрытии", "Ask about clearing TEMP on close" },
             { "Язык", "Language" },
             { "Очистить папку temp?", "Clear the temp folder?" },
-            { "В папке temp рядом с программой лежат распакованные пакеты (", "The temp folder next to the program holds unpacked packs (" },
+            { "В папке BRPC-temp лежат распакованные пакеты (", "The BRPC-temp folder holds unpacked packs (" },
             { " МБ). Очистить её?", " MB). Clear it?" },
             { "Больше не спрашивать", "Do not ask again" },
             { "Очистить", "Clear" },
@@ -1357,9 +1357,39 @@ namespace BedrockPackStudio
 
     static class PackLoader
     {
-        // Куда распаковываются архивы пакетов: папка temp рядом с самой программой. Если туда нельзя писать
-        // (программа лежит в защищённом месте), берётся временная папка Windows, как раньше.
+        // Куда распаковываются архивы пакетов: папка BRPC-temp рядом с самой программой. Если туда нельзя писать
+        // (программа лежит в защищённом месте), берётся такая же папка во временной папке Windows.
         public static string TempBase = PickTemp();
+
+        // Каждая папка, которую программа распаковала, получает рядом файл-метку «<папка>.brpc-temp». Очистка удаляет
+        // только помеченные папки: чужие файлы и папки, оказавшиеся в той же папке, она не трогает никогда.
+        const string MarkExt = ".brpc-temp";
+
+        static string MarkOf(string dir)
+        {
+            return dir.TrimEnd((char)92, (char)47) + MarkExt;
+        }
+
+        static void MarkTemp(string dir)
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(MarkOf(dir), "BRPC: unpacked pack, safe to delete together with the folder next to this file");
+        }
+
+        // Помеченные папки распаковки в обоих местах.
+        static List<string> MarkedDirs()
+        {
+            List<string> r = new List<string>();
+            foreach (string place in new string[] { TempBase, ShortBase })
+                try
+                {
+                    if (!Directory.Exists(place)) continue;
+                    foreach (string dir in Directory.GetDirectories(place))
+                        if (File.Exists(MarkOf(dir))) r.Add(dir);
+                }
+                catch (Exception) { }
+            return r;
+        }
 
         // Название источника: у архива — имя без расширения, у папки — её имя целиком («Faithful 1.20.4» не обрезается до «Faithful 1.20»).
         public static string BaseName(string path)
@@ -1410,54 +1440,36 @@ namespace BedrockPackStudio
             return most + (nested ? 80 : 0);
         }
 
-        // Сколько занято в папке распаковки (байт) и есть ли в ней что-нибудь.
+        // Сколько занимают распакованные программой пакеты (байт) и есть ли они вообще.
         public static long TempSize()
         {
             long total = 0;
-            try
-            {
-                foreach (string place in new string[] { TempBase, ShortBase })
-                    if (Directory.Exists(place))
-                        foreach (string file in Directory.GetFiles(place, "*", SearchOption.AllDirectories))
-                            try { total += new FileInfo(file).Length; } catch (Exception) { }
-            }
-            catch (Exception) { }
+            foreach (string dir in MarkedDirs())
+                try
+                {
+                    foreach (string file in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
+                        try { total += new FileInfo(file).Length; } catch (Exception) { }
+                }
+                catch (Exception) { }
             return total;
         }
 
         public static bool TempUsed()
         {
-            try
-            {
-                foreach (string place in new string[] { TempBase, ShortBase })
-                    if (Directory.Exists(place) && Directory.GetFileSystemEntries(place).Length > 0) return true;
-            }
-            catch (Exception) { }
-            return false;
+            return MarkedDirs().Count > 0;
         }
 
-        // Удалить всё распакованное.
+        // Удалить всё, что распаковала программа (только помеченные папки).
         public static void ClearTemp()
         {
-            try
-            {
-                foreach (string place in new string[] { TempBase, ShortBase })
-                {
-                    if (!Directory.Exists(place)) continue;
-                    foreach (string dir in Directory.GetDirectories(place))
-                        try { Directory.Delete(dir, true); } catch (Exception) { }
-                    foreach (string file in Directory.GetFiles(place))
-                        try { File.Delete(file); } catch (Exception) { }
-                }
-            }
-            catch (Exception) { }
+            foreach (string dir in MarkedDirs()) DropTemp(dir);
         }
 
         static string PickTemp()
         {
             try
             {
-                string near = Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location), "temp");
+                string near = Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location), "BRPC-temp");
                 Directory.CreateDirectory(near);
                 string probe = Path.Combine(near, Guid.NewGuid().ToString("N") + ".tmp");
                 File.WriteAllText(probe, "");
@@ -1465,7 +1477,7 @@ namespace BedrockPackStudio
                 return near;
             }
             catch (Exception) { }
-            return Path.Combine(Path.GetTempPath(), "BedrockPackStudio");
+            return Path.Combine(Path.GetTempPath(), "BRPC-temp");
         }
 
         public static int[] ReadVersion(object o)
@@ -1494,6 +1506,7 @@ namespace BedrockPackStudio
                 tempDir = TempDirFor(path, "");
                 tight = tempDir.Length + 1 + LongestInside(path) > 240;
                 if (tight) tempDir = ShortTemp();
+                MarkTemp(tempDir);
             }
             else if (!Directory.Exists(path)) throw new FileNotFoundException(L.T("Не найдено: ") + path);
             List<Pack> found = null;
@@ -1511,6 +1524,7 @@ namespace BedrockPackStudio
                     string made = tight || TempBase.Length > 120 ? ShortTemp() : TempDirFor(path, " (java)");
                     try
                     {
+                        MarkTemp(made);
                         JavaPack.Convert(javaRoot, BaseName(path), made, notes);
                         found = LoadFrom(path, made, made, notes);
                         foreach (Pack jp in found) jp.Java = true;
@@ -1560,9 +1574,17 @@ namespace BedrockPackStudio
             catch (Exception) { }
         }
 
+        // Удалить одну папку распаковки — только если программа сама её создала и пометила.
         public static void DropTemp(string dir)
         {
-            try { if (dir != null && Directory.Exists(dir)) Directory.Delete(dir, true); }
+            if (dir == null) return;
+            string mark = MarkOf(dir);
+            try
+            {
+                if (!File.Exists(mark)) return;
+                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                File.Delete(mark);
+            }
             catch (Exception) { }
         }
 
@@ -14366,7 +14388,7 @@ namespace BedrockPackStudio
                     k.Font = Font;
                     const int Pad = 14, W = 420;
                     Label label = new Label();
-                    label.Text = L.T("В папке temp рядом с программой лежат распакованные пакеты (") + Math.Max(1, PackLoader.TempSize() / (1024 * 1024)) + L.T(" МБ). Очистить её?");
+                    label.Text = L.T("В папке BRPC-temp лежат распакованные пакеты (") + Math.Max(1, PackLoader.TempSize() / (1024 * 1024)) + L.T(" МБ). Очистить её?");
                     label.SetBounds(Pad, Pad, W, 38);
                     CheckRow always = new CheckRow(), never = new CheckRow();
                     always.Text = L.T("Автоматически очищать TEMP BRPC");
