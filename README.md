@@ -34,6 +34,10 @@ The whole program is one file, `BRPC.cs`, and compiles with the C# compiler that
 
 Because of that compiler the code stays within C# 5.
 
+## Using built packs
+
+A built pack is made of other people's work. It is for your own game only. Publish or share it only with the permission of the original authors — they are listed in the `credits` folder inside the pack and in its `manifest.json`.
+
 ## Where it keeps its data
 
 - Settings and favourites: `%APPDATA%\BedrockPackStudio`
@@ -68,6 +72,8 @@ Not an official Minecraft product. Not approved by or associated with Mojang or 
 - Избранное, проекты `.brpc`, светлая и тёмная тема, русский и английский язык.
 
 **Запуск:** скачайте `BRPC.exe` со страницы [Releases](../../releases). Устанавливать ничего не нужно.
+
+**Использование собранных пакетов:** собранный пакет состоит из чужих работ и предназначен только для вашей игры. Выкладывать или передавать его можно только с разрешения авторов исходных пакетов — они перечислены в папке `credits` внутри пакета и в его `manifest.json`.
 
 **Сборка из исходного кода:** дважды щёлкните `build.bat` — он соберёт `BRPC.exe` компилятором, который уже есть в Windows.
 

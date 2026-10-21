@@ -204,6 +204,7 @@ namespace BedrockPackStudio
             { "Сначала добавьте хотя бы один пак.", "Add at least one pack first." },
             { "Пак Minecraft (*.mcpack)|*.mcpack|Архив ZIP (*.zip)|*.zip", "Minecraft pack (*.mcpack)|*.mcpack|ZIP archive (*.zip)|*.zip" },
             { "Пак сохранён:\n", "Pack saved:\n" },
+            { "Этот пакет собран из чужих работ. Он только для вашей игры. Выкладывать или передавать его можно только с разрешения авторов (они перечислены в папке credits внутри пакета).", "This pack is built from other people's work. It is for your own game only. Publish or share it only with the authors' permission (they are listed in the credits folder inside the pack)." },
             { "\n\nПоказать файл в проводнике?", "\n\nShow the file in Explorer?" },
             { "Сборка не удалась:\n", "The build failed:\n" },
             { "Файлы пакета пропали (папка temp очищена или пакет перемещён). Добавьте пакет заново.", "The pack files are gone (the temp folder was cleared or the pack was moved). Add the pack again." },
@@ -18797,7 +18798,9 @@ namespace BedrockPackStudio
                 try { log = Builder.Build(entries, packs, name, desc, file, VariantsForBuild()); }
                 finally { status.Text = statusWas; }
                 Cursor = Cursors.Default;
+                // сборка состоит из чужих работ: пользователь должен знать, что делиться ею можно только с разрешения авторов
                 string msg = L.T("Пак сохранён:\n") + file + "\n\n" + string.Join("\n", log.ToArray())
+                    + "\n\n" + L.T("Этот пакет собран из чужих работ. Он только для вашей игры. Выкладывать или передавать его можно только с разрешения авторов (они перечислены в папке credits внутри пакета).")
                     + L.T("\n\nПоказать файл в проводнике?");
                 if (MessageBox.Show(this, msg, Text, MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
                     Process.Start("explorer.exe", "/select,\"" + file + "\"");
