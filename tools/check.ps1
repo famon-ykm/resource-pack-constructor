@@ -215,7 +215,7 @@ $env:BPS_PREVIEW = $null; $env:BPS_SHOTMS = $null
 if ($proc.WaitForExit(60000) -and $proc.ExitCode -eq 0 -and (Test-Path "$t\shot.png")) { Ok 'запуск с неправильными проверочными значениями прошёл' } else { if (-not $proc.HasExited) { $proc.CloseMainWindow() | Out-Null }; Fail 'запуск с неправильными проверочными значениями не удался' }
 
 # ---- набор 3: временная папка — очистка убирает только своё
-Write-Host 'Набор 3: очистка временной папки не трогает чужие файлы'
+Write-Host 'Набор 3: очистка временной папки'
 $t = Join-Path $root 'set3'
 $app = Join-Path $t 'app'
 $tmp = Join-Path $t 'tmp'
@@ -234,7 +234,7 @@ $proc = Start-Process -FilePath (Join-Path $app 'ResourcePackConstructor.exe') -
 if ($proc.ExitCode -eq 0) { Ok 'архив собран' } else { Fail ('сборка архива завершилась с кодом ' + $proc.ExitCode) }
 $left = @(Get-ChildItem -LiteralPath "$app\BRPC-temp" -Force | Where-Object { $_.Name -ne 'чужой файл.txt' -and $_.Name -ne 'чужая папка' })
 if ($left.Count -eq 0) { Ok 'распакованное после сборки убрано' } else { Fail ('после сборки в BRPC-temp осталось: ' + (($left | ForEach-Object { $_.Name }) -join ', ')) }
-# полная очистка (как при закрытии программы): своя помеченная папка удаляется, чужое остаётся.
+# полная очистка (как при закрытии программы): BRPC-temp очищается целиком (решение автора), старая папка temp рядом не трогается.
 # Отдельный процесс с временной папкой Windows внутри проверки, чтобы не задеть открытое окно программы.
 New-Item -ItemType Directory -Force "$app\BRPC-temp\наша распаковка" | Out-Null
 W "$app\BRPC-temp\наша распаковка\a.txt" 'x'
@@ -255,7 +255,8 @@ try { $said = & powershell -NoProfile -ExecutionPolicy Bypass -File $probeFile (
 finally { $env:TMP = $oldTmp; $env:TEMP = $oldTemp }
 if ("$said" -like 'cleared*BRPC-temp') { Ok 'очистка запущена в BRPC-temp' } else { Fail ('очистка не запустилась: ' + $said) }
 if (-not (Test-Path -LiteralPath "$app\BRPC-temp\наша распаковка")) { Ok 'своя распаковка удалена' } else { Fail 'своя распаковка не удалена' }
-if ((Test-Path -LiteralPath "$app\BRPC-temp\чужой файл.txt") -and (Test-Path -LiteralPath "$app\BRPC-temp\чужая папка\внутри.txt") -and (Test-Path -LiteralPath "$app\temp\не удалять.txt")) { Ok 'чужие файлы и папки на месте' } else { Fail 'очистка удалила чужие файлы' }
+if (-not (Test-Path -LiteralPath "$app\BRPC-temp\чужой файл.txt") -and -not (Test-Path -LiteralPath "$app\BRPC-temp\чужая папка")) { Ok 'BRPC-temp очищена целиком' } else { Fail 'в BRPC-temp после очистки что-то осталось' }
+if (Test-Path -LiteralPath "$app\temp\не удалять.txt") { Ok 'папки вне BRPC-temp не тронуты' } else { Fail 'очистка задела папку вне BRPC-temp' }
 
 Write-Host ''
 if ($failed.Count -eq 0) {

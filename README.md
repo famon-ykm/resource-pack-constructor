@@ -60,7 +60,7 @@ Project files (`.brpc`) store full paths to your packs, which may include your W
 ## Where it keeps its files
 
 - Settings, favourites and manual layers: `%APPDATA%\BedrockPackStudio`
-- Unpacked archives: the `BRPC-temp` folder next to the exe (if it cannot be written there — `%TEMP%\BRPC-temp`; very long paths — `%TEMP%\BRPC`). The program offers to clear them on exit and only ever deletes the folders it created itself.
+- Unpacked archives: the `BRPC-temp` folder next to the exe (if it cannot be written there — `%TEMP%\BRPC-temp`; very long paths — `%TEMP%\BRPC`). The program offers to clear them on exit: the `BRPC-temp` folder is emptied completely (do not keep your own files there), in `%TEMP%\BRPC` only the folders it created itself are deleted.
 - Project files: wherever you save them.
 
 The program never changes the packs you load, except when you edit a file in it yourself. It writes nothing to the registry.
@@ -109,7 +109,7 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 
 **Где программа хранит файлы.**
 - Настройки, избранное, ручные слои: `%APPDATA%\BedrockPackStudio`.
-- Распакованные архивы: папка `BRPC-temp` рядом с exe (если туда нельзя писать — `%TEMP%\BRPC-temp`; для очень длинных путей — `%TEMP%\BRPC`). При выходе программа предлагает их очистить и удаляет только те папки, которые создала сама.
+- Распакованные архивы: папка `BRPC-temp` рядом с exe (если туда нельзя писать — `%TEMP%\BRPC-temp`; для очень длинных путей — `%TEMP%\BRPC`). При выходе программа предлагает их очистить: папка `BRPC-temp` очищается целиком (не храните в ней свои файлы), а в `%TEMP%\BRPC` удаляются только папки, которые создала сама программа.
 - Файлы проектов: там, где вы их сохранили.
 
 Программа не меняет загруженные пакеты, кроме файлов, которые вы сами правите в ней, и ничего не пишет в реестр.

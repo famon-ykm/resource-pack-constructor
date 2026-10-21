@@ -1506,10 +1506,30 @@ namespace BedrockPackStudio
         }
 
         // Сколько занимают распакованные программой пакеты (байт) и есть ли они вообще.
+        // Папка BRPC-temp принадлежит программе (решение автора 22.10.2026): при очистке из неё убирается всё.
+        // Защита от ошибки: так чистится только папка с этим именем, никакая другая.
+        static bool OwnBase()
+        {
+            return string.Equals(Path.GetFileName(TempBase.TrimEnd((char)92, (char)47)), "BRPC-temp", StringComparison.OrdinalIgnoreCase) && Directory.Exists(TempBase);
+        }
+
+        // Всё, что лежит в BRPC-temp, и помеченные папки в общей %TEMP%\BRPC.
+        static List<string> ClearableDirs()
+        {
+            List<string> r = MarkedDirs();
+            if (OwnBase())
+                try { foreach (string dir in Directory.GetDirectories(TempBase)) if (!r.Contains(dir)) r.Add(dir); }
+                catch (Exception) { }
+            return r;
+        }
+
         public static long TempSize()
         {
             long total = 0;
-            foreach (string dir in MarkedDirs())
+            if (OwnBase())
+                try { foreach (string file in Directory.GetFiles(TempBase)) try { total += new FileInfo(file).Length; } catch (Exception) { } }
+                catch (Exception) { }
+            foreach (string dir in ClearableDirs())
                 try
                 {
                     foreach (string file in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
@@ -1521,13 +1541,22 @@ namespace BedrockPackStudio
 
         public static bool TempUsed()
         {
-            return MarkedDirs().Count > 0;
+            if (ClearableDirs().Count > 0) return true;
+            try { return OwnBase() && Directory.GetFiles(TempBase).Length > 0; }
+            catch (Exception) { return false; }
         }
 
-        // Удалить всё, что распаковала программа (только помеченные папки).
+        // Очистка: всё содержимое BRPC-temp и помеченные папки в общей %TEMP%\BRPC.
         public static void ClearTemp()
         {
             foreach (string dir in MarkedDirs()) DropTemp(dir);
+            if (!OwnBase()) return;
+            try
+            {
+                foreach (string dir in Directory.GetDirectories(TempBase)) try { Directory.Delete(dir, true); } catch (Exception) { }
+                foreach (string file in Directory.GetFiles(TempBase)) try { File.Delete(file); } catch (Exception) { }
+            }
+            catch (Exception) { }
         }
 
         static string PickTemp()
@@ -14549,8 +14578,14 @@ namespace BedrockPackStudio
                 };
                 // при наведении — обычная подсказка программы: поддержка добровольная (среди пользователей много детей)
                 string payNote = L.T("Поддержка добровольная и по желанию — если вам нравится проект.\nЭто не покупка: программа бесплатна и ничего за это не открывает.\nЕсли вам меньше 18 лет, сначала спросите родителей.");
-                tips.SetToolTip(pay, payNote);
-                tips.SetToolTip(cap, payNote);
+                // список настроек — отдельное всплывающее окно, обычная подсказка в нём сама не появляется: показываем её вручную
+                foreach (Control noteOn in new Control[] { pay, cap })
+                {
+                    Control at = noteOn;
+                    at.MouseEnter += delegate { tips.Show(payNote, at, 0, at.Height + 4, 20000); };
+                    at.MouseLeave += delegate { tips.Hide(at); };
+                }
+                drop.Closed += delegate { tips.Hide(pay); tips.Hide(cap); };
                 box.Controls.Add(pay);
                 y += Row + 8 + 8;
             }
