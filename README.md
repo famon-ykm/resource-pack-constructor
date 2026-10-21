@@ -29,6 +29,38 @@ The program is in beta: it works, but not every part has been tested thoroughly.
 - Projects (`.brpc`) remember packs, order and every choice.
 - Light and dark theme, English and Russian interface.
 
+## What it looks like / Как это выглядит
+
+All screenshots use test packs drawn for this project. / Все снимки сделаны на тестовых пакетах, нарисованных для этого проекта.
+
+**Variants from every pack side by side.** Click to pick the texture you want; Ctrl+click picks several, and the game will choose between them at random.
+
+**Варианты из всех пакетов рядом.** Щелчок выбирает нужную текстуру; Ctrl+щелчок — несколько, и игра будет выбирать между ними случайно.
+
+![Variants](docs/feature-variants.png)
+
+**PBR layers.** Reflections, emission and relief are shown under each texture and can be taken from any pack.
+
+**Слои PBR.** Отражения, свечение и рельеф видны под каждой текстурой, каждый слой можно взять из любого пакета.
+
+![Layers](docs/feature-layers.png)
+
+**Large preview on hover**, with animation for animated textures. / **Крупное превью при наведении**, анимированные текстуры проигрываются.
+
+![Preview](docs/feature-hover.png)
+
+**3D view.** Blocks and mobs assembled from the chosen textures. / **Режим 3D.** Блоки и мобы, собранные из выбранных текстур.
+
+![3D view](docs/feature-3d.png)
+
+**Texture editor** with tools, colour panel, layers of the texture and a live 3D view. / **Редактор текстур** с инструментами, панелью цвета, слоями текстуры и 3D-видом во время рисования.
+
+![Texture editor](docs/feature-editor.png)
+
+**Pack files.** Browse every file of a pack and edit JSON right in the program. / **Файлы пакета.** Просмотр всех файлов пакета и правка JSON прямо в программе.
+
+![Pack files](docs/feature-files.png)
+
 ## Download and run
 
 Take `ResourcePackConstructor.exe` from the [Releases](../../releases) page and run it. Nothing to install: it needs only .NET Framework 4.x, which is part of Windows 10 and 11.

@@ -7,7 +7,7 @@
 !README.md
 !LICENSE
 !docs/
-!docs/screenshot.png
+!docs/*.png
 !tools/
 !tools/check.bat
 !tools/check.ps1
