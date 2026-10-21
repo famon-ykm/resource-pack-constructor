@@ -1413,6 +1413,13 @@ namespace BedrockPackStudio
         }
     }
 
+    // Сработал предел распаковки одного источника (объём, число файлов, вложенные архивы). Отдельный тип нужен, чтобы
+    // отличать его от просто испорченного вложенного архива: тот пропускается, а предел останавливает загрузку.
+    class SourceLimitException : IOException
+    {
+        public SourceLimitException(string message) : base(message) { }
+    }
+
     static class PackLoader
     {
         // Куда распаковываются архивы пакетов: папка BRPC-temp рядом с самой программой. Если туда нельзя писать
@@ -1626,7 +1633,7 @@ namespace BedrockPackStudio
                 {
                     string ext = Path.GetExtension(file).ToLowerInvariant();
                     if (ext != ".mcpack" && ext != ".zip" && ext != ".mcaddon") continue;
-                    if (--nestedLeft < 0) throw new InvalidDataException(L.T("В архиве слишком много вложенных архивов (больше ") + SourceNested + ").");
+                    if (--nestedLeft < 0) throw new SourceLimitException(L.T("В архиве слишком много вложенных архивов (больше ") + SourceNested + ").");
                     // короткое имя папки: у вложенного архива путь и так длинный
                     string sub = Path.Combine(Path.GetDirectoryName(file), "p" + (++unwrapped));
                     try
@@ -1635,11 +1642,11 @@ namespace BedrockPackStudio
                         File.Delete(file);
                         if (depth < 2) Unwrap(sub, depth + 1);
                     }
-                    catch (InvalidDataException) { throw; } // сработал предел — загрузка источника останавливается
+                    catch (SourceLimitException) { throw; } // сработал предел — загрузка источника останавливается; битый вложенный архив просто пропускается
                     catch (Exception) { }
                 }
             }
-            catch (InvalidDataException) { throw; }
+            catch (SourceLimitException) { throw; }
             catch (Exception) { }
         }
 
@@ -1768,7 +1775,7 @@ namespace BedrockPackStudio
                 {
                     string name = en.FullName.Replace('\\', '/');
                     if (name.EndsWith("/") || name.Length == 0) continue;
-                    if (++count > 200000) throw new InvalidDataException(L.T("Архив слишком большой."));
+                    if (++count > 200000) throw new SourceLimitException(L.T("Архив слишком большой."));
                     string dest;
                     try
                     {
@@ -1788,7 +1795,7 @@ namespace BedrockPackStudio
                         while ((n = src.Read(buf, 0, buf.Length)) > 0)
                         {
                             bytesLeft -= n;
-                            if (bytesLeft < 0) throw new InvalidDataException(L.T("Архив слишком большой: после распаковки больше 4 ГБ."));
+                            if (bytesLeft < 0) throw new SourceLimitException(L.T("Архив слишком большой: после распаковки больше 4 ГБ."));
                             dst.Write(buf, 0, n);
                         }
                     }

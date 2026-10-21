@@ -144,6 +144,16 @@ $proc = Start-Process -FilePath $exe -ArgumentList @('--merge', ('"' + "$t\out.m
 $sw.Stop()
 $log = if (Test-Path "$t\out.mcpack.log") { [IO.File]::ReadAllText("$t\out.mcpack.log", [Text.Encoding]::UTF8) } else { '' }
 if ($proc.ExitCode -ne 0 -and $log -match 'вложенных архивов') { Ok ('архив с 201 вложенным архивом остановлен за ' + [int]$sw.Elapsed.TotalSeconds + ' с') } else { Fail ('архивная бомба не остановлена (код ' + $proc.ExitCode + ')') }
+# аддон с нормальным пакетом и лишним испорченным архивом рядом: пакет должен открыться
+$addon = Join-Path $t 'addon'
+W "$t\AP\manifest.json" (MkMan 'AP' '')
+MkPng "$t\AP\textures\blocks\stone.png" ([System.Drawing.Color]::Red)
+New-Item -ItemType Directory -Force $addon | Out-Null
+[IO.Compression.ZipFile]::CreateFromDirectory("$t\AP", "$addon\pack.mcpack")
+[IO.File]::WriteAllBytes("$addon\source.zip", [Text.Encoding]::ASCII.GetBytes('this is not a zip archive'))
+[IO.Compression.ZipFile]::CreateFromDirectory($addon, "$t\addon.mcaddon")
+$proc = Start-Process -FilePath $exe -ArgumentList @('--merge', ('"' + "$t\addon_out.mcpack" + '"'), '"Merged"', ('"' + "$t\addon.mcaddon" + '"')) -Wait -PassThru
+if ($proc.ExitCode -eq 0 -and (Test-Path "$t\addon_out.mcpack")) { Ok 'аддон с испорченным лишним архивом открывается' } else { Fail 'аддон с испорченным лишним архивом не открылся' }
 # картинка, которая в заголовке называет себя 20000×20000
 $png = "$t\huge.png"
 MkPng $png ([System.Drawing.Color]::Red)

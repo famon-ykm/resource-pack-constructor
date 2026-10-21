@@ -47,6 +47,10 @@ Because of that compiler the code stays within C# 5. The program was written wit
 
 A built pack is made of other people's work. It is for your own game only. Publish or share it only with the permission of the original authors — they are listed in the `credits` folder inside the pack and in its `manifest.json`.
 
+## Files you load
+
+Resource packs are made by other people and can contain anything. Load only packs and project files you trust. You are responsible for the files you load into the program and for the packs you build and share. The program is provided "as is", without warranty — see the [MIT license](LICENSE).
+
 ## Privacy
 
 The program works offline. It has no accounts, no analytics, no crash reporting and makes no network connections. Nothing you load or create leaves your computer. The only links to the internet are buttons that open a page in your browser: PayPal in Settings, and GitHub/Discord under the pack list. From there the rules of those sites apply.
@@ -98,6 +102,8 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 **Обновление.** Новые версии выкладываются на той же странице Releases: скачайте новый exe и замените им старый — настройки и избранное сохранятся.
 
 **Использование собранных пакетов.** Собранный пакет состоит из чужих работ и предназначен только для вашей игры. Выкладывать или передавать его можно только с разрешения авторов исходных пакетов — они перечислены в папке `credits` внутри пакета и в его `manifest.json`.
+
+**Файлы, которые вы загружаете.** Пакеты ресурсов делают другие люди, и в них может быть что угодно. Загружайте только те пакеты и файлы проектов, которым доверяете. За файлы, которые вы загружаете в программу, и за пакеты, которые собираете и передаёте другим, отвечаете вы. Программа предоставляется «как есть», без гарантий — см. [лицензию MIT](LICENSE).
 
 **Конфиденциальность.** Программа работает без интернета: нет аккаунтов, аналитики, отчётов об ошибках, она не устанавливает сетевых соединений. То, что вы загружаете и создаёте, не покидает ваш компьютер. Ссылки в интернет — только кнопки, открывающие страницу в браузере: PayPal в настройках, GitHub и Discord под списком пакетов; дальше действуют правила этих сайтов. Файлы проектов `.brpc` хранят полные пути к пакетам, в них может быть имя пользователя Windows — проверьте, прежде чем делиться.
 
