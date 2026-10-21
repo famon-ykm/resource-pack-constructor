@@ -177,6 +177,33 @@ if (Test-Path $r.Zip) {
     if (($names -contains 'readme.txt') -and -not ($names -contains 'page.html') -and -not ($names -contains 'picture.svg')) { Ok '.html и .svg из пакета в сборку не попали, .txt попал' } else { Fail ('опасные файлы в сборке: ' + ($names -join ', ')) }
 } else { Fail 'сборка с опасными файлами не создана' }
 
+# ---- набор 6: чужой файл проекта не ведёт к сетевым папкам, кривые проверочные значения не роняют программу
+Write-Host 'Набор 6: пути из файла проекта и проверочные значения'
+$t = Join-Path $root 'set6'
+New-Item -ItemType Directory -Force $t | Out-Null
+$pathProbe = @'
+param($exe)
+$asm = [Reflection.Assembly]::LoadFile($exe)
+$f = [Reflection.BindingFlags]'Static,Public,NonPublic'
+$lp = $asm.GetType('BedrockPackStudio.MainForm').GetMethod('LocalPath', $f)
+$res = @()
+foreach ($p in 'C:\Packs\A', 'd:/packs/b', '\\server\share\pack', '//server/share', 'packs\relative', '\rooted', 'http://x/y', 'C:') { $res += ($p + '=' + $lp.Invoke($null, @($p))) }
+$int = $asm.GetType('BedrockPackStudio.Program').GetMethod('Int', $f)
+$res += ('abc=' + $int.Invoke($null, @('abc', 7)))
+$res += (' 12 =' + $int.Invoke($null, @(' 12 ', 7)))
+$res -join ';'
+'@
+$pathProbeFile = Join-Path $t 'pathprobe.ps1'
+[IO.File]::WriteAllText($pathProbeFile, $pathProbe, (New-Object System.Text.UTF8Encoding $true))
+$said = "" + (& powershell -NoProfile -ExecutionPolicy Bypass -File $pathProbeFile $exe)
+$want = 'C:\Packs\A=True;d:/packs/b=True;\\server\share\pack=False;//server/share=False;packs\relative=False;\rooted=False;http://x/y=False;C:=False;abc=7; 12 =12'
+if ($said -eq $want) { Ok 'сетевые и неполные пути из проекта не открываются, обычные — открываются' } else { Fail ('проверка путей: ' + $said) }
+if ($said -match 'abc=7') { Ok 'неправильное число в проверочной переменной не роняет программу' }
+$env:BPS_PREVIEW = 'abc'; $env:BPS_SHOTMS = 'x'
+$proc = Start-Process -FilePath $exe -ArgumentList @('--shot', ('"' + "$t\shot.png" + '"')) -PassThru
+$env:BPS_PREVIEW = $null; $env:BPS_SHOTMS = $null
+if ($proc.WaitForExit(60000) -and $proc.ExitCode -eq 0 -and (Test-Path "$t\shot.png")) { Ok 'запуск с неправильными проверочными значениями прошёл' } else { if (-not $proc.HasExited) { $proc.CloseMainWindow() | Out-Null }; Fail 'запуск с неправильными проверочными значениями не удался' }
+
 # ---- набор 3: временная папка — очистка убирает только своё
 Write-Host 'Набор 3: очистка временной папки не трогает чужие файлы'
 $t = Join-Path $root 'set3'

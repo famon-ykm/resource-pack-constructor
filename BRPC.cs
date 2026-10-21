@@ -211,6 +211,7 @@ namespace BedrockPackStudio
             { "В сборке нет ни одного файла: все текстуры выключены или убраны в корзину.", "There is nothing to build: every texture is switched off or in the bin." },
             { "Идёт сборка…", "Building…" },
             { "Сохранить проект перед выходом?", "Save the project before exit?" },
+            { "Пропущен путь не с этого компьютера или неполный: ", "Skipped a path that is not on this computer or is incomplete: " },
             { "Ни один пакет проекта не найден.", "None of the project's packs were found." },
             { "Категории", "Categories" },
             { "Файлы", "Files" },
@@ -16614,7 +16615,7 @@ namespace BedrockPackStudio
             main.SplitterDistance = 316;
             // для проверочных снимков: другая ширина левой колонки, как после сдвига разделителя мышью
             string split = Environment.GetEnvironmentVariable("BPS_SPLIT");
-            if (split != null) Shown += delegate { main.SplitterDistance = int.Parse(split); };
+            if (split != null) Shown += delegate { main.SplitterDistance = Program.Int(split, main.SplitterDistance); };
             left.SplitterDistance = 240;
             main.FixedPanel = FixedPanel.Panel1;
             // правая часть не сжимается до наезда кнопок друг на друга; задаётся после показа: до него окно ещё узкое
@@ -18402,6 +18403,14 @@ namespace BedrockPackStudio
             }
         }
 
+        // Путь на дисках этого компьютера: «C:\…». Сетевые («\\компьютер\…»), адреса и неполные пути — нет.
+        static bool LocalPath(string path)
+        {
+            if (path.Length < 3 || path.IndexOf("://", StringComparison.Ordinal) >= 0) return false;
+            char d = char.ToUpperInvariant(path[0]);
+            return d >= (char)65 && d <= (char)90 && path[1] == (char)58 && (path[2] == (char)92 || path[2] == (char)47);
+        }
+
         public void OpenProject(string file)
         {
             if (packs.Count > 0 && MessageBox.Show(this, L.T("Открыть проект? Загруженные сейчас пакеты и выбор будут заменены."), Text,
@@ -18424,6 +18433,14 @@ namespace BedrockPackStudio
                     string path = o == null ? null : o.Get("path") as string;
                     bool isFav = o != null && o.Get("fav") != null;
                     if (isFav) path = Favorites.Dir;
+                    // файл проекта могли прислать: путь к чужому компьютеру в сети («\\компьютер\папка») или неполный путь
+                    // не открывается — программа не должна сама обращаться к сетевым папкам
+                    if (!isFav && path != null && !LocalPath(path))
+                    {
+                        notes.Add(L.T("Пропущен путь не с этого компьютера или неполный: ") + path);
+                        byNumber.Add(null);
+                        continue;
+                    }
                     Pack p = null;
                     try
                     {
@@ -18435,6 +18452,7 @@ namespace BedrockPackStudio
                         }
                         int index;
                         int.TryParse(o.Get("index") is JLit ? ((JLit)o.Get("index")).Raw : "0", out index);
+                        if (index < 0) index = 0;
                         p = found.Count > index ? found[index] : (found.Count > 0 ? found[0] : null);
                         if (p != null && byNumber.Contains(p))
                         {
@@ -18972,7 +18990,7 @@ namespace BedrockPackStudio
                 if (Environment.GetEnvironmentVariable("BPS_ALLTEX") != null) SetFilter(allTextures); // общий список при включённом избранном
                 // для проверки: навести мышь на значок пакета в строке с этим номером
                 string iconAt = Environment.GetEnvironmentVariable("BPS_ICON");
-                if (iconAt != null && hoverPackIcon != null) hoverPackIcon(int.Parse(iconAt));
+                if (iconAt != null && hoverPackIcon != null) hoverPackIcon(Program.Int(iconAt, 0));
                 // для проверки: нажать «Файлы» дважды (включить и отжать)
                 if (Environment.GetEnvironmentVariable("BPS_FILESOFF") != null) { modeFiles.PerformClick(); modeFiles.PerformClick(); }
                 // для проверки: нажать «Категории» (отжать её), как щелчком мыши
@@ -19023,7 +19041,7 @@ namespace BedrockPackStudio
                 if (late != null)
                 {
                     Timer lt = new Timer();
-                    lt.Interval = int.Parse(Environment.GetEnvironmentVariable("BPS_LATEMS") ?? "700"); // снимок делается через 1300 мс после показа
+                    lt.Interval = Math.Max(1, Program.Int(Environment.GetEnvironmentVariable("BPS_LATEMS"), 700)); // снимок делается через 1300 мс после показа
                     lt.Tick += delegate { lt.Stop(); AddPaths(new string[] { late }); };
                     lt.Start();
                 }
@@ -19036,7 +19054,7 @@ namespace BedrockPackStudio
                         foreach (string num in kv[1].Split(','))
                         {
                             Entry ve = entries.Find(delegate(Entry x) { return x.Key == kv[0]; });
-                            if (ve != null) ToggleVariant(ve, packs[int.Parse(num)]);
+                            if (ve != null) ToggleVariant(ve, packs[Program.Int(num, 0)]);
                         }
                     }
                 string dropSpec = Environment.GetEnvironmentVariable("BPS_LAYDROP"); // для проверки: перенести слои, "ключ|откуда|куда|слот;…"
@@ -19071,8 +19089,8 @@ namespace BedrockPackStudio
                         string[] dp = oneDrop.Split(new char[] { (char)124 });
                         Entry de = entries.Find(delegate(Entry x) { return x.Key == dp[0]; });
                         if (de == null) continue;
-                        KeyValuePair<string, string> di = SlotItem(de, packs[int.Parse(dp[1])], dp[3]);
-                        if (di.Key != null) DropLayer(de, di.Key, di.Value, packs[int.Parse(dp[2])], gallery.MultiLayerOn(de, packs[int.Parse(dp[1])], di.Key, di.Value) == true);
+                        KeyValuePair<string, string> di = SlotItem(de, packs[Program.Int(dp[1], 0)], dp[3]);
+                        if (di.Key != null) DropLayer(de, di.Key, di.Value, packs[Program.Int(dp[2], 0)], gallery.MultiLayerOn(de, packs[Program.Int(dp[1], 0)], di.Key, di.Value) == true);
                         dumpMinis(oneDrop);
                     }
                 string layTrash = Environment.GetEnvironmentVariable("BPS_LAYTRASH"); // для проверки: слой в корзину, "ключ|пакет|слот;…"
@@ -19082,8 +19100,8 @@ namespace BedrockPackStudio
                         string[] lt = one.Split(new char[] { (char)124 });
                         Entry le = entries.Find(delegate(Entry x) { return x.Key == lt[0]; });
                         if (le == null) continue;
-                        KeyValuePair<string, string> li = SlotItem(le, packs[int.Parse(lt[1])], lt[2]);
-                        if (li.Key != null) TrashLayer(le, packs[int.Parse(lt[1])], li.Key, li.Value);
+                        KeyValuePair<string, string> li = SlotItem(le, packs[Program.Int(lt[1], 0)], lt[2]);
+                        if (li.Key != null) TrashLayer(le, packs[Program.Int(lt[1], 0)], li.Key, li.Value);
                         dumpMinis("trash " + one);
                     }
                 string trashSpec = Environment.GetEnvironmentVariable("BPS_TRASH"); // для проверки: убрать текстуры в корзину, "ключ|пакет;…"
@@ -19092,11 +19110,11 @@ namespace BedrockPackStudio
                     {
                         string[] tp = one.Split(new char[] { (char)124 });
                         Entry te = entries.Find(delegate(Entry x) { return x.Key == tp[0]; });
-                        if (te != null) TrashTexture(te, packs[int.Parse(tp[1])]);
+                        if (te != null) TrashTexture(te, packs[Program.Int(tp[1], 0)]);
                     }
                 if (Environment.GetEnvironmentVariable("BPS_TRASHVIEW") != null) SetTrashView(true); // для проверки: открыть корзину
                 string undoSpec = Environment.GetEnvironmentVariable("BPS_UNDO");                    // для проверки: отменить столько шагов
-                if (undoSpec != null) for (int ui = 0; ui < int.Parse(undoSpec); ui++) Undo();
+                if (undoSpec != null) for (int ui = 0; ui < Program.Int(undoSpec, 0); ui++) Undo();
                 string navSpec = Environment.GetEnvironmentVariable("BPS_NAV"); // для проверки: нажатия стрелок, "Down,Right,Enter"
                 if (navSpec != null)
                 {
@@ -19126,8 +19144,8 @@ namespace BedrockPackStudio
                         t3.Tick += delegate
                         {
                             t3.Stop();
-                            if (test3D[0] == (char)110) objView.TestNav(int.Parse(test3D.Substring(1)), 9); // "n5": выделить пятый и пройти 9 шагов
-                            else objView.TestHover(int.Parse(test3D.Substring(1)), test3D[0] == (char)103);
+                            if (test3D[0] == (char)110) objView.TestNav(Program.Int(test3D.Substring(1), 0), 9); // "n5": выделить пятый и пройти 9 шагов
+                            else objView.TestHover(Program.Int(test3D.Substring(1), 0), test3D[0] == (char)103);
                         };
                         t3.Start();
                     }
@@ -19137,7 +19155,7 @@ namespace BedrockPackStudio
                 {
                     string[] atcParts = attachSpec.Split((char)124);
                     Entry atcLayer = entries.Find(delegate(Entry x) { return x.Key == atcParts[0]; }), atcTarget = entries.Find(delegate(Entry x) { return x.Key == atcParts[2]; });
-                    if (atcLayer != null && atcTarget != null) AttachLayer(atcLayer, packs[int.Parse(atcParts[1])], atcTarget, packs[int.Parse(atcParts[3])]);
+                    if (atcLayer != null && atcTarget != null) AttachLayer(atcLayer, packs[Program.Int(atcParts[1], 0)], atcTarget, packs[Program.Int(atcParts[3], 0)]);
                 }
                 if (Environment.GetEnvironmentVariable("BPS_PANE") != null) PickLeft(modePreview); // для проверки: нажать «Превью»
                 string buildTo = Environment.GetEnvironmentVariable("BPS_BUILD");
@@ -19168,7 +19186,7 @@ namespace BedrockPackStudio
                 if (offSpec != null) foreach (string k in offSpec.Split(';')) overrides[k] = Pack.Off;
                 if (node != null || open != null || slotChoice.Count > 0 || offSpec != null) Recollect();
                 string hover = Environment.GetEnvironmentVariable("BPS_HOVER"); // "x,y" в координатах витрины
-                if (hover != null) gallery.TestHover(new Point(int.Parse(hover.Split(',')[0]), int.Parse(hover.Split(',')[1])));
+                if (hover != null) gallery.TestHover(new Point(Program.Int(hover.Split(',')[0], 0), Program.Int(hover.Split(',').Length > 1 ? hover.Split(',')[1] : null, 0)));
                 string saveTo = Environment.GetEnvironmentVariable("BPS_SAVEPROJ"); // для проверки: сохранить проект без окна
                 if (saveTo != null) SaveProjectTo(saveTo);
                 string openFile = Environment.GetEnvironmentVariable("BPS_FILE"); // открыть файл первого пака в режиме «Файлы пака»
@@ -19200,12 +19218,12 @@ namespace BedrockPackStudio
                         Entry editNext = edit.Contains(";") ? entries.Find(delegate(Entry x) { return x.Key == edit.Split(';')[1]; }) : null;
                         if (editNext != null) openEditor(editNext, editNext.Winner, null);
                         string editHover = Environment.GetEnvironmentVariable("BPS_EDITHOVER");
-                        if (editHover != null) texEditor.TestHover(int.Parse(editHover));
+                        if (editHover != null) texEditor.TestHover(Program.Int(editHover, 0));
                         target = texEditor;
                     }
                 }
                 Timer t = new Timer();
-                t.Interval = int.Parse(Environment.GetEnvironmentVariable("BPS_SHOTMS") ?? "1300"); // через сколько после показа делать снимок
+                t.Interval = Math.Max(1, Program.Int(Environment.GetEnvironmentVariable("BPS_SHOTMS"), 1300)); // через сколько после показа делать снимок
                 t.Tick += delegate
                 {
                     t.Stop();
@@ -19616,7 +19634,7 @@ namespace BedrockPackStudio
     {
         // для проверочных снимков: BPS_PREVIEW — размер в процентах и «зажатый» Alt
         static readonly string test = Environment.GetEnvironmentVariable("BPS_PREVIEW");
-        public static float Scale = test == null ? 1f : int.Parse(test) / 100f;
+        public static float Scale = test == null ? 1f : Math.Max(50, Math.Min(200, Program.Int(test, 100))) / 100f;
 
         public static bool Alt { get { return test != null || (Control.ModifierKeys & Keys.Alt) != 0; } }
 
@@ -19765,6 +19783,13 @@ namespace BedrockPackStudio
 
     static class Program
     {
+        // Число из проверочной переменной; неправильное значение — значение по умолчанию, а не ошибка.
+        public static int Int(string s, int fallback)
+        {
+            int v;
+            return s != null && int.TryParse(s.Trim(), out v) ? v : fallback;
+        }
+
         // Для проверок: BPS_SLOTS="файл|вид слоя=имя пака;…" задаёт выбор отдельных слоёв (имя off — выключить).
         public static void TestSlots(List<Pack> packs, Dictionary<string, Pack> slots)
         {
