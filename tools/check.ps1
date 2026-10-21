@@ -164,6 +164,19 @@ if ("$said" -match '20000') { Ok 'картинка 20000×20000 не загру�
 $said = & powershell -NoProfile -ExecutionPolicy Bypass -File $imgProbeFile $exe "$root\set1\A\textures\blocks\stone.png"
 if ("$said" -eq 'loaded') { Ok 'обычная картинка загружается' } else { Fail ('обычная картинка не загрузилась: ' + $said) }
 
+# опасные файлы внутри пакета в сборку не идут, обычные — идут
+$h = Join-Path $t 'H'
+W "$h\manifest.json" (MkMan 'H' '')
+MkPng "$h\textures\blocks\stone.png" ([System.Drawing.Color]::Red)
+W "$h\readme.txt" 'hello'
+W "$h\page.html" '<script>alert(1)</script>'
+W "$h\picture.svg" '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+$r = Merge $t @('H')
+if (Test-Path $r.Zip) {
+    $z = [IO.Compression.ZipFile]::OpenRead($r.Zip); $names = @($z.Entries | ForEach-Object { $_.FullName }); $z.Dispose()
+    if (($names -contains 'readme.txt') -and -not ($names -contains 'page.html') -and -not ($names -contains 'picture.svg')) { Ok '.html и .svg из пакета в сборку не попали, .txt попал' } else { Fail ('опасные файлы в сборке: ' + ($names -join ', ')) }
+} else { Fail 'сборка с опасными файлами не создана' }
+
 # ---- набор 3: временная папка — очистка убирает только своё
 Write-Host 'Набор 3: очистка временной папки не трогает чужие файлы'
 $t = Join-Path $root 'set3'

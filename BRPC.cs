@@ -19526,7 +19526,13 @@ namespace BedrockPackStudio
     {
         static readonly HashSet<string> programs = new HashSet<string>(new string[] {
             ".exe", ".com", ".scr", ".pif", ".bat", ".cmd", ".lnk", ".url", ".js", ".jse", ".vbs", ".vbe", ".wsf", ".wsh", ".ps1", ".psm1",
-            ".msi", ".msp", ".hta", ".jar", ".reg", ".cpl", ".dll", ".sys", ".inf", ".chm", ".application", ".appref-ms", ".gadget", ".scf", ".sh", ".py" });
+            ".msi", ".msp", ".hta", ".jar", ".reg", ".cpl", ".dll", ".sys", ".inf", ".chm", ".application", ".appref-ms", ".gadget", ".scf", ".sh", ".py",
+            // то, что Windows тоже может запустить или исполнить: страницы со скриптами, документы с макросами, установщики приложений, ярлыки
+            ".msc", ".msu", ".msh", ".ws", ".wsc", ".sct", ".xbap", ".xll", ".jnlp", ".diagcab", ".website", ".iqy", ".slk",
+            ".html", ".htm", ".xht", ".xhtml", ".mht", ".mhtml", ".svg",
+            ".docm", ".dotm", ".xlsm", ".xltm", ".xlam", ".pptm", ".potm", ".ppam", ".ppsm", ".sldm",
+            ".appx", ".appxbundle", ".msix", ".msixbundle", ".appinstaller",
+            ".settingcontent-ms", ".library-ms", ".search-ms", ".searchconnector-ms", ".vhd", ".vhdx" });
         static readonly HashSet<string> archives = new HashSet<string>(new string[] {
             ".zip", ".mcpack", ".mcaddon", ".mcworld", ".mctemplate", ".rar", ".7z", ".tar", ".gz", ".cab", ".iso" });
         // то, из чего состоит пакет ресурсов: это можно открывать без вопросов
