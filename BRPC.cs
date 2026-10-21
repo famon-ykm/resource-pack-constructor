@@ -15294,7 +15294,7 @@ namespace BedrockPackStudio
             modeBtn.FlatAppearance.MouseOverBackColor = mode3D ? Color.FromArgb(58, 184, 100) : Color.Empty;
             modeBtn.FlatAppearance.MouseDownBackColor = mode3D ? Color.FromArgb(34, 136, 68) : Color.Empty;
         }
-        const string DefaultName = "MyResourcePack";
+        const string DefaultName = "ResourcePackConstructor";
 
         [DllImport("user32.dll")]
         static extern bool PrintWindow(IntPtr hWnd, IntPtr hdc, int flags);
