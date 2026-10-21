@@ -22,7 +22,7 @@ namespace BedrockPackStudio
     static class Support
     {
         public const string PayPal = "https://paypal.me/FilippKolesnikov";
-        public const string GitHub = "";  // страница проекта, например https://github.com/имя/BRPC
+        public const string GitHub = "https://github.com/famon-ykm/resource-pack-constructor"; // страница проекта: отзывы и новые версии
         public const string Discord = ""; // приглашение на сервер, например https://discord.gg/код
     }
     // ------------------------------------------------------------------ Язык интерфейса
