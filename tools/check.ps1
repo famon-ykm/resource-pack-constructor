@@ -1,10 +1,10 @@
-﻿# Проверка одной кнопкой: собирает два набора тестовых пакетов через BRPC.exe --merge
+﻿# Проверка одной кнопкой: собирает два набора тестовых пакетов через ResourcePackConstructor.exe --merge
 # и сверяет результат с ожидаемым. Всё создаётся во временной папке Windows, проект не трогается.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-$exe = Join-Path (Split-Path $PSScriptRoot -Parent) 'BRPC.exe'
+$exe = Join-Path (Split-Path $PSScriptRoot -Parent) 'ResourcePackConstructor.exe'
 $root = Join-Path ([IO.Path]::GetTempPath()) 'BRPC-check'
 $failed = New-Object System.Collections.Generic.List[string]
 
@@ -12,7 +12,7 @@ function Fail($text) { $failed.Add($text); Write-Host ('  ОШИБКА: ' + $tex
 function Ok($text) { Write-Host ('  ok: ' + $text) -ForegroundColor DarkGray }
 
 if (-not (Test-Path $exe)) {
-    Write-Host 'Не найден BRPC.exe рядом с папкой tools. Сначала соберите программу: build.bat' -ForegroundColor Red
+    Write-Host 'Не найден ResourcePackConstructor.exe рядом с папкой tools. Сначала соберите программу: build.bat' -ForegroundColor Red
     exit 2
 }
 
@@ -210,7 +210,7 @@ $t = Join-Path $root 'set3'
 $app = Join-Path $t 'app'
 $tmp = Join-Path $t 'tmp'
 New-Item -ItemType Directory -Force $app, $tmp | Out-Null
-Copy-Item $exe (Join-Path $app 'BRPC.exe')
+Copy-Item $exe (Join-Path $app 'ResourcePackConstructor.exe')
 # чужое: файл и папка в BRPC-temp, старая папка temp
 W "$app\BRPC-temp\чужой файл.txt" 'не удалять'
 W "$app\BRPC-temp\чужая папка\внутри.txt" 'не удалять'
@@ -220,7 +220,7 @@ W "$t\Z\manifest.json" (MkMan 'Z' '')
 MkPng "$t\Z\textures\blocks\stone.png" ([System.Drawing.Color]::Red)
 [IO.Compression.ZipFile]::CreateFromDirectory("$t\Z", "$t\Z.mcpack")
 $env:BPS_DEFAULTS = '1'; $env:BPS_LANG = 'ru'
-$proc = Start-Process -FilePath (Join-Path $app 'BRPC.exe') -ArgumentList @('--merge', ('"' + "$t\out.mcpack" + '"'), '"Merged"', ('"' + "$t\Z.mcpack" + '"')) -Wait -PassThru
+$proc = Start-Process -FilePath (Join-Path $app 'ResourcePackConstructor.exe') -ArgumentList @('--merge', ('"' + "$t\out.mcpack" + '"'), '"Merged"', ('"' + "$t\Z.mcpack" + '"')) -Wait -PassThru
 if ($proc.ExitCode -eq 0) { Ok 'архив собран' } else { Fail ('сборка архива завершилась с кодом ' + $proc.ExitCode) }
 $left = @(Get-ChildItem -LiteralPath "$app\BRPC-temp" -Force | Where-Object { $_.Name -ne 'чужой файл.txt' -and $_.Name -ne 'чужая папка' })
 if ($left.Count -eq 0) { Ok 'распакованное после сборки убрано' } else { Fail ('после сборки в BRPC-temp осталось: ' + (($left | ForEach-Object { $_.Name }) -join ', ')) }
@@ -241,7 +241,7 @@ $probeFile = Join-Path $t 'probe.ps1'
 [IO.File]::WriteAllText($probeFile, $probe, (New-Object System.Text.UTF8Encoding $true))
 $oldTmp = $env:TMP; $oldTemp = $env:TEMP
 $env:TMP = $tmp; $env:TEMP = $tmp
-try { $said = & powershell -NoProfile -ExecutionPolicy Bypass -File $probeFile (Join-Path $app 'BRPC.exe') }
+try { $said = & powershell -NoProfile -ExecutionPolicy Bypass -File $probeFile (Join-Path $app 'ResourcePackConstructor.exe') }
 finally { $env:TMP = $oldTmp; $env:TEMP = $oldTemp }
 if ("$said" -like 'cleared*BRPC-temp') { Ok 'очистка запущена в BRPC-temp' } else { Fail ('очистка не запустилась: ' + $said) }
 if (-not (Test-Path -LiteralPath "$app\BRPC-temp\наша распаковка")) { Ok 'своя распаковка удалена' } else { Fail 'своя распаковка не удалена' }

@@ -1,4 +1,4 @@
-// BRPC (Bedrock Resource Pack Constructor) — просмотр и объединение пакетов текстур Minecraft Bedrock.
+// Resource Pack Constructor: for Minecraft Bedrock (Beta) — просмотр и объединение пакетов текстур Minecraft Bedrock.
 // Интерфейс на двух языках: строки в коде русские, английский перевод — в классе L.
 // Собирается штатным компилятором .NET Framework (см. build.bat), поэтому код держится в рамках C# 5.
 using System;
@@ -476,7 +476,7 @@ namespace BedrockPackStudio
             { "Сохранить проект", "Save project" },
             { "Сохранить в файл список пакетов и весь сделанный выбор, чтобы продолжить позже", "Save the pack list and every choice you made to a file, to continue later" },
             { "Открыть сохранённый проект", "Open a saved project" },
-            { "Проект BRPC (*.brpc)|*.brpc", "BRPC project (*.brpc)|*.brpc" },
+            { "Проект Resource Pack Constructor (*.brpc)|*.brpc", "Resource Pack Constructor project (*.brpc)|*.brpc" },
             { "Проект сохранён: ", "Project saved: " },
             { "Открыть проект? Загруженные сейчас пакеты и выбор будут заменены.", "Open the project? The packs and choices loaded now will be replaced." },
             { "Не найден пакет: ", "Pack not found: " },
@@ -15325,7 +15325,7 @@ namespace BedrockPackStudio
 
         public MainForm()
         {
-            Text = "BRPC - Bedrock Resource Pack Constructor";
+            Text = "Resource Pack Constructor: for Minecraft Bedrock (Beta)";
             WheelFilter wheel = new WheelFilter();
             wheel.Wheel = OnWheel;
             Application.AddMessageFilter(wheel);
@@ -18322,7 +18322,7 @@ namespace BedrockPackStudio
         {
             using (SaveFileDialog d = new SaveFileDialog())
             {
-                d.Filter = L.T("Проект BRPC (*.brpc)|*.brpc");
+                d.Filter = L.T("Проект Resource Pack Constructor (*.brpc)|*.brpc");
                 string safe = PackName();
                 foreach (char c in Path.GetInvalidFileNameChars()) safe = safe.Replace(c, '_');
                 d.FileName = safe + ".brpc";
@@ -18412,7 +18412,7 @@ namespace BedrockPackStudio
         {
             using (OpenFileDialog d = new OpenFileDialog())
             {
-                d.Filter = L.T("Проект BRPC (*.brpc)|*.brpc");
+                d.Filter = L.T("Проект Resource Pack Constructor (*.brpc)|*.brpc");
                 if (d.ShowDialog(this) == DialogResult.OK) OpenProject(d.FileName);
             }
         }
@@ -19863,7 +19863,7 @@ namespace BedrockPackStudio
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             Application.ThreadException += delegate(object sender, System.Threading.ThreadExceptionEventArgs e)
             {
-                MessageBox.Show(L.T("Непредвиденная ошибка:\n") + e.Exception.Message, "BRPC", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(L.T("Непредвиденная ошибка:\n") + e.Exception.Message, "Resource Pack Constructor", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             };
             MainForm f = new MainForm();
             int first = 0;
