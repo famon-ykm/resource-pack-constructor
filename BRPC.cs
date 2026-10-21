@@ -14632,15 +14632,11 @@ namespace BedrockPackStudio
                     try { Process.Start(Support.PayPal.Trim()); }
                     catch (Exception ex) { MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
                 };
-                // при наведении — обычная подсказка программы: поддержка добровольная (среди пользователей много детей)
+                // при наведении на кнопку — обычная подсказка программы: поддержка добровольная (среди пользователей много детей).
+                // Список настроек — отдельное всплывающее окно, обычная подсказка в нём сама не появляется: показываем её вручную
                 string payNote = L.T("Поддержка добровольная и по желанию — если вам нравится проект.\nЭто не покупка: программа бесплатна и ничего за это не открывает.\nЕсли вам меньше 18 лет, сначала спросите родителей.");
-                // список настроек — отдельное всплывающее окно, обычная подсказка в нём сама не появляется: показываем её вручную
-                foreach (Control noteOn in new Control[] { pay, cap })
-                {
-                    Control at = noteOn;
-                    at.MouseEnter += delegate { HoverNote.ShowAt(at, payNote, drop.Items.Count > 0 ? drop.Items[0] : null); };
-                    at.MouseLeave += delegate { HoverNote.HideNote(); };
-                }
+                pay.MouseEnter += delegate { HoverNote.ShowAt(pay, payNote, drop.Items.Count > 0 ? drop.Items[0] : null); };
+                pay.MouseLeave += delegate { HoverNote.HideNote(); };
                 pay.Click += delegate { HoverNote.HideNote(); };
                 drop.Closed += delegate { HoverNote.HideNote(); };
                 box.Controls.Add(pay);
