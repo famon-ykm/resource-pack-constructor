@@ -7278,6 +7278,62 @@ namespace BedrockPackStudio
 
     // Обычная кнопка без рамки «кнопки по умолчанию»: система обводит такой рамкой кнопку, которая сработает по Enter,
     // и на цветной кнопке («Скачать») эта рамка выглядит светлой каймой.
+    // Подсказка в виде обычных подсказок программы для мест, где ToolTip не работает (всплывающий список настроек —
+    // отдельное окно). Она открывается как вложенный список того же меню: так список настроек под ней не закрывается.
+    class HoverNote : Control
+    {
+        const int PadX = 12, PadY = 9;
+        const TextFormatFlags Flags = TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
+        static ToolStripDropDown drop;
+        static HoverNote body;
+        string note = "";
+
+        HoverNote()
+        {
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Rectangle r = ClientRectangle;
+            using (SolidBrush back = new SolidBrush(Theme.Dark ? Theme.Card : Color.White)) e.Graphics.FillRectangle(back, r);
+            using (Pen edge = new Pen(Theme.Dark ? Theme.Dim : Color.FromArgb(118, 118, 118))) e.Graphics.DrawRectangle(edge, 0, 0, r.Width - 1, r.Height - 1);
+            TextRenderer.DrawText(e.Graphics, note, SystemFonts.MessageBoxFont, new Rectangle(PadX, PadY, r.Width - PadX * 2, r.Height - PadY * 2),
+                Theme.Dark ? Theme.Text : Color.FromArgb(30, 30, 30), Flags);
+        }
+
+        // Показать рядом с элементом at, который лежит в списке owner (пункт всплывающего меню).
+        public static void ShowAt(Control at, string text, ToolStripItem owner)
+        {
+            if (drop == null || drop.IsDisposed)
+            {
+                body = new HoverNote();
+                ToolStripControlHost host = new ToolStripControlHost(body);
+                host.AutoSize = false;
+                host.Margin = Padding.Empty;
+                host.Padding = Padding.Empty;
+                drop = new ToolStripDropDown();
+                drop.Padding = Padding.Empty;
+                drop.AutoClose = false;
+                drop.DropShadowEnabled = false;
+                drop.Items.Add(host);
+            }
+            body.note = text;
+            Size t = TextRenderer.MeasureText(text, SystemFonts.MessageBoxFont, new Size(int.MaxValue, int.MaxValue), Flags);
+            Size size = new Size(t.Width + PadX * 2, t.Height + PadY * 2);
+            body.Size = size;
+            drop.Items[0].Size = size;
+            drop.Size = size;
+            drop.OwnerItem = owner;
+            body.Invalidate();
+            drop.Show(at, new Point(at.Width + 8, 0)); // справа от элемента: саму кнопку подсказка не закрывает
+        }
+
+        public static void HideNote()
+        {
+            if (drop != null && !drop.IsDisposed && drop.Visible) drop.Close();
+        }
+    }
     class CleanButton : Button
     {
         protected override bool ShowFocusCues { get { return false; } }
@@ -14582,10 +14638,11 @@ namespace BedrockPackStudio
                 foreach (Control noteOn in new Control[] { pay, cap })
                 {
                     Control at = noteOn;
-                    at.MouseEnter += delegate { tips.Show(payNote, at, 0, at.Height + 4, 20000); };
-                    at.MouseLeave += delegate { tips.Hide(at); };
+                    at.MouseEnter += delegate { HoverNote.ShowAt(at, payNote, drop.Items.Count > 0 ? drop.Items[0] : null); };
+                    at.MouseLeave += delegate { HoverNote.HideNote(); };
                 }
-                drop.Closed += delegate { tips.Hide(pay); tips.Hide(cap); };
+                pay.Click += delegate { HoverNote.HideNote(); };
+                drop.Closed += delegate { HoverNote.HideNote(); };
                 box.Controls.Add(pay);
                 y += Row + 8 + 8;
             }
